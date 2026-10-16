@@ -1,0 +1,43 @@
+name: Verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: go test ./...
+      - run: bun run build
+      - run: bun test npm
+      - name: Verify npm installation
+        run: |
+          npm pack --ignore-scripts
+          npm install --prefix build/npm-check --ignore-scripts --no-audit --no-fund ./composablehorizons-kpm-0.1.0.tgz
+          node build/npm-check/node_modules/@composablehorizons/kpm/bin/kpm.cjs --version
+  gradle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
+      - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - name: Verify Kotlin Multiplatform consumer
+        run: ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain

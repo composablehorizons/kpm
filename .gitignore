@@ -1,0 +1,9 @@
+dist/
+node_modules/
+*.tgz
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.env
+.DS_Store

@@ -1,0 +1,28 @@
+{
+  "name": "@composablehorizons/kpm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Package versioning and Maven Central publishing for Kotlin libraries.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/composablehorizons/kpm.git"
+  },
+  "bin": {
+    "kpm": "bin/kpm.cjs"
+  },
+  "files": [
+    "bin/kpm.cjs",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "bun scripts/build.mjs",
+    "test": "go test ./... && bun test npm",
+    "prepack": "bun run build"
+  }
+}
