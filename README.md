@@ -26,6 +26,7 @@ In `settings.gradle.kts`:
 ```kotlin
 pluginManagement {
     repositories {
+        mavenCentral()
         gradlePluginPortal()
     }
 }
