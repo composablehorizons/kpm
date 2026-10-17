@@ -2,24 +2,40 @@
 
 Version and publish Kotlin libraries with npm-style commands.
 
-```sh
-kpm version patch
-kpm publish
-```
+![Purple KPM wordmark on a white background](assets/readme-banner.png)
 
-Keep your library's version, Maven coordinates, and publishing metadata in one `package.yml`. KPM creates version commits and Git tags, and its Gradle plugin configures Maven Central publishing and signing for you.
+Keep your library's version, Maven coordinates, and publishing metadata in one
+`package.yml`. KPM creates version commits and Git tags, and its Gradle plugin
+configures Maven Central publishing and signing for you.
 
-KPM is for maintainers of Kotlin/JVM and Kotlin Multiplatform libraries. It works on macOS, Linux, and Windows, with x64 and ARM64 binaries included.
+For maintainers of Kotlin/JVM and Kotlin Multiplatform libraries. Available on
+macOS, Linux, and Windows, with bundled x64 and ARM64 binaries.
 
-## Quick start
+[Installation](#installation) · [Quick start](#quick-start) · [Examples](#examples) · [Commands](#command-reference) · [Package metadata](#packageyml-reference) · [MIT license](LICENSE)
 
-### 1. Download via npm
+![KPM bumping a library version and publishing it to Maven Central]()
+
+## Installation
+
+Install the CLI from npm:
 
 ```sh
 npm install --global @composablehorizons/kpm
+kpm --version
 ```
 
-### 2. Configure plugin repositories
+Requires **Node.js 18+** and npm. The package includes a native binary for each
+supported platform; using the published CLI does not require Go.
+
+Your library needs a Gradle wrapper and JDK 17+. Git is required for version
+commits and tags. Publishing also needs a Maven Central namespace, a Central
+Portal user token, and a GPG signing key; see [publishing credentials](#publishing-credentials).
+
+## Quick start
+
+Configure KPM in your library before running package commands.
+
+### 1. Configure plugin repositories
 
 In `settings.gradle.kts`:
 
@@ -32,7 +48,7 @@ pluginManagement {
 }
 ```
 
-### 3. Add the Gradle plugin
+### 2. Add the Gradle plugin
 
 In `build.gradle.kts`:
 
@@ -42,7 +58,7 @@ plugins {
 }
 ```
 
-### 4. Add package metadata
+### 3. Add package metadata
 
 Create `package.yml` next to `build.gradle.kts` and replace the example values:
 
@@ -66,7 +82,7 @@ scm:
   url: https://github.com/example/my-library
 ```
 
-### 5. Verify setup
+### 4. Verify setup
 
 Run from the directory containing `package.yml`:
 
@@ -75,32 +91,24 @@ kpm version
 kpm publish --dry-run
 ```
 
-## Requirements
+## Features
 
-- npm to install the CLI.
-- A Kotlin/JVM or Kotlin Multiplatform library with a Gradle wrapper and JDK 17+.
-- Git for version commits and tags.
-- For Maven Central publishing: a registered namespace, a Central Portal user token, and a GPG signing key.
+- **One metadata file:** `package.yml` supplies the version, Maven coordinates,
+  license, developers, and SCM information for the generated POM.
+- **Semantic versioning:** choose `patch`, `minor`, `major`, an exact version, or
+  a version from a Git tag.
+- **Release commits and tags:** version changes create a commit and annotated
+  tag by default, with configurable messages and prefixes.
+- **Gradle publishing:** the plugin configures Maven Central publication and
+  signing using standard Gradle credentials.
+- **Terminal and CI workflows:** use the same commands locally or in GitHub
+  Actions, with a dry run to inspect the publishing task graph.
 
-## Release from your terminal
+## Examples
 
-### Configure publishing credentials
+### Create and publish a release
 
-Before publishing, you'll need a [Maven Central account and registered namespace](https://central.sonatype.org/publish/requirements/), a Central Portal user token, and a GPG signing key.
-
-KPM uses the standard Gradle publishing properties. Set them through environment variables, your user-level Gradle configuration, or CI secrets. For example:
-
-```sh
-export ORG_GRADLE_PROJECT_mavenCentralUsername="YOUR_CENTRAL_TOKEN_USERNAME"
-export ORG_GRADLE_PROJECT_mavenCentralPassword="YOUR_CENTRAL_TOKEN_PASSWORD"
-export ORG_GRADLE_PROJECT_signingInMemoryKey="$(cat /path/to/private-signing-key.asc)"
-export ORG_GRADLE_PROJECT_signingInMemoryKeyId="YOUR_KEY_ID"
-export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="YOUR_KEY_PASSWORD"
-```
-
-The signing key must be ASCII-armored. The key ID and password depend on your key configuration. Keep credentials out of `package.yml` and version control.
-
-### Create and publish a version
+Configure [publishing credentials](#publishing-credentials) first.
 
 Start with a clean Git working tree:
 
@@ -120,6 +128,70 @@ For later releases, use `patch`, `minor`, `major`, or an exact version:
 kpm version minor
 kpm version 1.0.0
 ```
+
+### Change metadata without a commit or tag
+
+```sh
+kpm version minor --no-git-tag-version
+```
+
+This updates `package.yml` only, so you can review or commit the change yourself.
+
+### Read a version from Git
+
+```sh
+kpm version from-git --no-git-tag-version
+```
+
+This uses the nearest reachable Git tag with the configured prefix removed.
+The default tag prefix is `v`.
+
+## Command reference
+
+| Command | What it does |
+| --- | --- |
+| `kpm --version` | Prints the installed KPM version. |
+| `kpm version` | Prints the current library version. |
+| `kpm version patch` | Increments the patch version, or removes its prerelease suffix. |
+| `kpm version minor` | Selects the next minor release. |
+| `kpm version major` | Selects the next major release. |
+| `kpm version 1.2.3` | Sets an exact semantic version. |
+| `kpm version from-git` | Uses the nearest reachable Git tag, with the configured prefix removed. |
+| `kpm publish --dry-run` | Shows the publishing task graph without executing it. |
+| `kpm publish` | Publishes the current version through Gradle. |
+
+Version commands accept these options before or after the version argument:
+
+| Option | Use it to… |
+| --- | --- |
+| `--no-git-tag-version` | Update `package.yml` without committing or tagging. |
+| `--message 'Release %s'` | Customize the commit and tag message; `%s` becomes the version. |
+| `--tag-version-prefix release-` | Change the default `v` tag prefix. |
+| `--allow-same-version` | Explicitly permit keeping the current version. |
+
+Version changes require a clean working tree unless you use `--no-git-tag-version`. KPM checks for an existing tag before updating metadata. Version commands never push to a remote.
+
+For all command options, run:
+
+```sh
+kpm --help
+```
+
+## Publishing credentials
+
+Before publishing, you'll need a [Maven Central account and registered namespace](https://central.sonatype.org/publish/requirements/), a Central Portal user token, and a GPG signing key.
+
+KPM uses the standard Gradle publishing properties. Set them through environment variables, your user-level Gradle configuration, or CI secrets. For example:
+
+```sh
+export ORG_GRADLE_PROJECT_mavenCentralUsername="YOUR_CENTRAL_TOKEN_USERNAME"
+export ORG_GRADLE_PROJECT_mavenCentralPassword="YOUR_CENTRAL_TOKEN_PASSWORD"
+export ORG_GRADLE_PROJECT_signingInMemoryKey="$(cat /path/to/private-signing-key.asc)"
+export ORG_GRADLE_PROJECT_signingInMemoryKeyId="YOUR_KEY_ID"
+export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="YOUR_KEY_PASSWORD"
+```
+
+The signing key must be ASCII-armored. The key ID and password depend on your key configuration. Keep credentials out of `package.yml` and version control.
 
 ## Release with GitHub Actions
 
@@ -176,31 +248,6 @@ With this workflow in place, create the version locally and push the commit and 
 kpm version patch
 git push --follow-tags
 ```
-
-## Command reference
-
-| Command | What it does |
-| --- | --- |
-| `kpm --version` | Prints the installed KPM version. |
-| `kpm version` | Prints the current library version. |
-| `kpm version patch` | Increments the patch version, or removes its prerelease suffix. |
-| `kpm version minor` | Selects the next minor release. |
-| `kpm version major` | Selects the next major release. |
-| `kpm version 1.2.3` | Sets an exact semantic version. |
-| `kpm version from-git` | Uses the nearest reachable Git tag, with the configured prefix removed. |
-| `kpm publish --dry-run` | Shows the publishing task graph without executing it. |
-| `kpm publish` | Publishes the current version through Gradle. |
-
-Version commands accept these options before or after the version argument:
-
-| Option | Use it to… |
-| --- | --- |
-| `--no-git-tag-version` | Update `package.yml` without committing or tagging. |
-| `--message 'Release %s'` | Customize the commit and tag message; `%s` becomes the version. |
-| `--tag-version-prefix release-` | Change the default `v` tag prefix. |
-| `--allow-same-version` | Explicitly permit keeping the current version. |
-
-Version changes require a clean working tree unless you use `--no-git-tag-version`. KPM checks for an existing tag before updating metadata. Version commands never push to a remote.
 
 ## package.yml reference
 
@@ -269,3 +316,52 @@ All text fields must be non-empty strings when supplied. Add multiple entries un
 Run the CLI from the directory containing `package.yml`. It reads only that directory and reports an error if the file is missing. The Gradle plugin reads it from the project where the plugin is applied. For publishing, that directory must also contain the Gradle wrapper.
 
 Use KPM per library build. Keep dependency declarations and their versions in Gradle.
+
+## Limitations and troubleshooting
+
+- **Dependency management stays in Gradle.** KPM versions and publishes library
+  packages; it does not install or resolve dependencies from `package.yml`.
+- **No `package.yml` found?** Run from the directory containing it. The CLI does
+  not search parent directories. Keep the Gradle wrapper there for publishing.
+- **Working tree is dirty?** Commit or stash changes before creating a version
+  commit/tag, or use `--no-git-tag-version` to update metadata only.
+- **Tag already exists?** Choose a new version or check the tag prefix. KPM
+  checks for an existing tag before changing the metadata.
+- **Nothing was pushed?** Version commands create local commits and tags. Push
+  them separately when you are ready.
+- **Need to verify a release?** Run your library's checks separately. `kpm publish`
+  does not run the test suite. `--dry-run` shows Gradle's task graph without
+  executing publishing tasks or uploading artifacts.
+- **Publishing or signing fails?** Check your Maven Central namespace, token,
+  ASCII-armored signing key, and Gradle publishing properties.
+
+## Development and contributing
+
+Building the CLI requires Go 1.22+; the npm package build and launcher tests use
+Bun. Gradle plugin development also requires JDK 17+.
+
+```sh
+# Build the native CLI for all supported platforms
+bun run build
+
+# Test the Go CLI and npm launcher
+bun run test
+
+# Test and validate the Gradle plugin
+./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+```
+
+The [Kotlin Multiplatform example](examples/kotlin-library) uses the local plugin
+through an included build. Check its JVM/Wasm compilation and generated POMs with:
+
+```sh
+./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
+```
+
+Report reproducible bugs or propose changes through the repository's issues and
+pull requests. Include the command, relevant `package.yml` fields, and platform
+or Gradle details. Keep credentials and private signing keys out of reports.
+
+## License
+
+[MIT](LICENSE) © Composable Horizons.
