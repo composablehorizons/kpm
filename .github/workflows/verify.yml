@@ -25,6 +25,7 @@ jobs:
       - run: bun run build
       - run: bun test npm
       - name: Verify npm installation
+        shell: bash
         run: |
           archive="$(npm pack --ignore-scripts --silent)"
           npm install --prefix build/npm-check --ignore-scripts --no-audit --no-fund "./$archive"
