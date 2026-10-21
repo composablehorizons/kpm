@@ -26,8 +26,8 @@ jobs:
       - run: bun test npm
       - name: Verify npm installation
         run: |
-          npm pack --ignore-scripts
-          npm install --prefix build/npm-check --ignore-scripts --no-audit --no-fund ./composablehorizons-kpm-0.1.0.tgz
+          archive="$(npm pack --ignore-scripts --silent)"
+          npm install --prefix build/npm-check --ignore-scripts --no-audit --no-fund "./$archive"
           node build/npm-check/node_modules/@composablehorizons/kpm/bin/kpm.cjs --version
   gradle:
     runs-on: ubuntu-latest

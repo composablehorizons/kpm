@@ -30,7 +30,10 @@ tasks.test { maxParallelForks = 1 }
 
 mavenPublishing {
     coordinates("com.composables", "kpm", project.version.toString())
-    publishToMavenCentral(automaticRelease = true)
+    publishToMavenCentral(
+        automaticRelease = true,
+        validateDeployment = com.vanniktech.maven.publish.DeploymentValidation.NONE,
+    )
     if (providers.gradleProperty("signingInMemoryKey").orNull?.isNotBlank() == true) {
         signAllPublications()
     }

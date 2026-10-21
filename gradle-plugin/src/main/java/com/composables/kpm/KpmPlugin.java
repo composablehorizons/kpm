@@ -1,5 +1,6 @@
 package com.composables.kpm;
 
+import com.vanniktech.maven.publish.DeploymentValidation;
 import com.vanniktech.maven.publish.MavenPublishBaseExtension;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,7 @@ public final class KpmPlugin implements Plugin<Project> {
         project.getPluginManager().apply("com.vanniktech.maven.publish");
         var publishing = project.getExtensions().getByType(MavenPublishBaseExtension.class);
         publishing.coordinates(metadata.groupId, metadata.artifactId, metadata.version);
-        publishing.publishToMavenCentral(true);
+        publishing.publishToMavenCentral(true, DeploymentValidation.NONE);
         if (!project.getProviders().gradleProperty("signingInMemoryKey").getOrElse("").isBlank()) {
             publishing.signAllPublications();
         }

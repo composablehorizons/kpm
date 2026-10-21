@@ -54,7 +54,7 @@ In `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("com.composables.kpm") version "0.1.0"
+    id("com.composables.kpm") version "0.1.1"
 }
 ```
 
@@ -120,7 +120,7 @@ kpm publish
 
 With the quick-start metadata, `kpm version patch` changes `0.1.0-SNAPSHOT` to `0.1.0`, commits `package.yml`, and creates the annotated tag `v0.1.0`.
 
-`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads and automatically releases them on Maven Central. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
+`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads them for automatic release on Maven Central. It returns after upload without waiting for Central validation or download availability. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
 
 For later releases, use `patch`, `minor`, `major`, or an exact version:
 

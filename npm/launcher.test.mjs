@@ -1,4 +1,5 @@
 import { test, expect } from 'bun:test';
+import { version } from '../package.json';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,5 +23,5 @@ test('launcher propagates command errors', () => {
   expect(result.stderr).toContain('unknown command');
 });
 test('tool version is distinct from the package version', () => {
-  expect(run(['--version']).stdout.trim()).toBe('0.1.0');
+  expect(run(['--version']).stdout.trim()).toBe(version);
 });
