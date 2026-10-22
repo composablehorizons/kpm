@@ -89,8 +89,11 @@ func TestInstallWithoutVersionAndNoArgumentInstall(t *testing.T) {
 	if _, err := invoke(dir, "i", "example:tool"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(readFile(t, dir, "package.yml"), "example:tool:2.0.0") {
-		t.Fatal("latest version was not saved")
+	if content := readFile(t, dir, "package.yml"); !strings.Contains(content, "example:tool") || strings.Contains(content, "example:tool:") {
+		t.Fatal("versionless declaration was not preserved")
+	}
+	if strings.Contains(readFile(t, dir, "calls"), "-Pkpm.lookup=") {
+		t.Fatal("versionless install looked up a version")
 	}
 	before := readFile(t, dir, "package.yml")
 	if _, err := invoke(dir, "i"); err != nil {
@@ -103,6 +106,25 @@ func TestInstallWithoutVersionAndNoArgumentInstall(t *testing.T) {
 		t.Fatal("install did not request lock update")
 	}
 }
+func TestInstallLatestSavesExactVersion(t *testing.T) {
+	dir := dependencyProject(t, dependencyManifest)
+	if _, err := invoke(dir, "i", "example:tool@latest"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(readFile(t, dir, "package.yml"), "example:tool:2.0.0") {
+		t.Fatal("latest release was not saved as an exact version")
+	}
+	if !strings.Contains(readFile(t, dir, "calls"), "-Pkpm.lookup=example:tool:latest.release") {
+		t.Fatal("latest release was not looked up through Gradle")
+	}
+	if _, err := invoke(dir, "i", "example:tool"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(readFile(t, dir, "package.yml"), "example:tool:") {
+		t.Fatal("reinstall did not remove explicit version")
+	}
+}
+
 func TestFailedInstallRestoresOriginalManifest(t *testing.T) {
 	dir := dependencyProject(t, dependencyManifest)
 	writeFile(t, dir, "fail-install", "")
@@ -174,7 +196,8 @@ func TestListOutdatedAndUpdate(t *testing.T) {
 }
 func TestInvalidDependencyCommandsDoNotModifyManifest(t *testing.T) {
 	for _, args := range [][]string{
-		{"i", "broken"}, {"i", "example:tool:"}, {"i", "example:tool:1", "--api", "--implementation"},
+		{"i", "broken"}, {"i", "example:tool@next"}, {"i", "example:tool:1@latest"},
+		{"rm", "example:tool@latest"}, {"update", "example:tool@latest"}, {"i", "example:tool:"}, {"i", "example:tool:1", "--api", "--implementation"},
 		{"i", "--target"}, {"i", "--target=../bad", "example:tool:1"}, {"i", "--api"}, {"list", "example:tool"},
 		{"outdated", "--api"}, {"rm"}, {"update", "example:tool:1.0.0"}, {"i", "example:tool:1", "--save"},
 	} {
@@ -191,7 +214,7 @@ func TestInvalidDependencyCommandsDoNotModifyManifest(t *testing.T) {
 }
 func TestRejectsMalformedDependencyDeclarations(t *testing.T) {
 	for _, yaml := range []string{
-		"dependencies: false\n", "dependencies: [example:tool]\n",
+		"dependencies: false\n", "dependencies: [example:tool:]\n", "dependencies: [example:tool@latest]\n",
 		"dependencies:\n  common:\n    testOnly: []\n", "dependencies: [example:tool:1, example:tool:2]\n",
 		"dependencies: &deps [example:tool:1]\n", "dependencies:\n  common: [example:tool:1]\n  android: *missing\n",
 	} {
@@ -203,9 +226,13 @@ func TestRejectsMalformedDependencyDeclarations(t *testing.T) {
 }
 
 func TestUpdateSavePreservesSelectorsAndSavesExactResolvedVersions(t *testing.T) {
-	for _, version := range []string{"1.0.0", "1.+", "[1.0,2.0)"} {
+	for _, version := range []string{"", "1.0.0", "1.+", "[1.0,2.0)"} {
 		t.Run(version, func(t *testing.T) {
-			dir := dependencyProject(t, dependencyManifest+"dependencies:\n  common:\n    api:\n      - example:tool:"+version+"\n")
+			notation := "example:tool"
+			if version != "" {
+				notation += ":" + version
+			}
+			dir := dependencyProject(t, dependencyManifest+"dependencies:\n  common:\n    api:\n      - "+notation+"\n")
 			writeFile(t, dir, "test-report", `{"dependencies":[{"target":"common","scope":"api","id":"example:tool","declared":"`+version+`","current":"1.1.0","wanted":"1.1.0"}]}`)
 			if _, err := invoke(dir, "up", "--save"); err != nil {
 				t.Fatal(err)
@@ -214,7 +241,16 @@ func TestUpdateSavePreservesSelectorsAndSavesExactResolvedVersions(t *testing.T)
 			if version == "1.0.0" {
 				expected = "1.1.0"
 			}
-			if !strings.Contains(readFile(t, dir, "package.yml"), "example:tool:"+expected) {
+			expectedNotation := "example:tool"
+			if expected != "" {
+				expectedNotation += ":" + expected
+			}
+			p, err := readPackage(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			deps, err := manifestDependencies(p.document.Content[0])
+			if err != nil || len(deps) != 1 || deps[0].node.Value != expectedNotation {
 				t.Fatal("unexpected saved version")
 			}
 		})

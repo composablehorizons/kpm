@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
 ### Changed
+
+- Bare `group:artifact` installs and manifest entries now defer version selection to Gradle constraints. Use `kpm i group:artifact@latest` to look up and save an exact latest release. Versionless declarations are preserved by `update --save`.
 
 - Publish the npm CLI, Maven plugin, and GitHub release through the GitHub Actions release workflow. npm uses trusted publishing; manual recovery can target one registry without repeating an accepted Maven upload.
 

@@ -135,6 +135,39 @@ public class KpmPluginTest {
         assertTrue(Files.readString(report).contains("\"current\":\"1.1.0\""));
     }
 
+    @Test public void resolvesVersionlessDependenciesUsingBomAndPreservesManagedWantedVersion() throws Exception {
+        Path root = project("name: Example\ndescription: Example app\nversion: 1.2.3\ndependencies: [example:tool]\n");
+        Path repo = root.resolve("repo");
+        localArtifact(repo, "1.0.0"); localArtifact(repo, "1.1.0");
+        Files.writeString(repo.resolve("example/tool/maven-metadata.xml"),
+            "<metadata><groupId>example</groupId><artifactId>tool</artifactId><versioning><release>1.1.0</release><versions><version>1.0.0</version><version>1.1.0</version></versions></versioning></metadata>");
+        Path bom = repo.resolve("example/alignment/1.0");
+        Files.createDirectories(bom);
+        Files.writeString(bom.resolve("alignment-1.0.pom"), """
+            <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>alignment</artifactId>
+            <version>1.0</version><packaging>pom</packaging><dependencyManagement><dependencies>
+            <dependency><groupId>example</groupId><artifactId>tool</artifactId><version>1.0.0</version></dependency>
+            </dependencies></dependencyManagement></project>
+            """);
+        String build = "plugins { id 'com.composables.kpm'; id 'java-library' }\nrepositories { maven { url = uri('repo') } }\n";
+        Files.writeString(root.resolve("build.gradle"), build + "dependencies { implementation platform('example:alignment:1.0') }\n");
+        Path report = root.resolve("report.json");
+        for (String task : new String[] {"kpmInstall", "kpmList", "kpmOutdated"}) {
+            runner(root, task, "--no-configuration-cache", "-Pkpm.report=" + report).build();
+            String result = Files.readString(report);
+            assertTrue(result.contains("\"id\":\"example:tool\""));
+            assertTrue(result.contains("\"declared\":\"\""));
+            assertTrue(result.contains("\"current\":\"1.0.0\""));
+            assertTrue(result.contains("\"wanted\":\"1.0.0\""));
+            if (task.equals("kpmOutdated")) assertTrue(result.contains("\"latest\":\"1.1.0\""));
+        }
+        // Gradle must fail when no BOM or other constraint supplies the missing version.
+        Files.writeString(root.resolve("build.gradle"), build);
+        runner(root, "kpmInstall", "--no-configuration-cache", "-Pkpm.report=" + report).buildAndFail();
+        Files.writeString(root.resolve("package.yml"), "name: Example\ndescription: Example\nversion: 1.2.3\ndependencies: [example:tool, example:tool:1.0.0]\n");
+        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Duplicate dependency"));
+    }
+
     @Test public void attachesExplicitScopesToGradleAndRejectsMissingTargets() throws Exception {
         Path root = project("name: Example\ndescription: Example\nversion: 1.2.3\ndependencies:\n  jvm:\n    api: [example:public:1.0]\n    implementation: [example:internal:1.0]\n");
         Files.writeString(root.resolve("build.gradle"), "plugins { id 'com.composables.kpm'; id 'java-library' }\nafterEvaluate { assert configurations.api.dependencies*.name == ['public']; assert configurations.implementation.dependencies*.name == ['internal'] }\n");

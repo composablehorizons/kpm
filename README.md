@@ -8,7 +8,7 @@ Add dependencies to Kotlin/JVM, Android, and Kotlin Multiplatform projects from
 the terminal. KPM keeps them in `package.yml` and uses Gradle to resolve them:
 
 ```sh
-kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core
+kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core@latest
 kpm list
 ```
 
@@ -73,7 +73,7 @@ Add KPM alongside your existing Kotlin or Android plugin in `build.gradle.kts`:
 ```kotlin
 plugins {
     // Keep your existing Kotlin/Android plugin here.
-    id("com.composables.kpm") version "0.2.1"
+    id("com.composables.kpm") version "0.3.0"
 }
 
 repositories {
@@ -97,7 +97,7 @@ version: 0.1.0
 Run from the directory containing `package.yml` and the Gradle wrapper:
 
 ```sh
-kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core
+kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core@latest
 kpm list
 ```
 
@@ -133,8 +133,11 @@ Apply the KPM plugin alongside your Kotlin or Android plugin, configure your tar
 # Install and save an exact version (i is an alias for install)
 kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2
 
-# Omit the version to look up and save the latest release through Gradle
-kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core
+# Look up and save the latest release through Gradle
+kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core@latest
+
+# Leave version selection to an existing Gradle BOM or dependency constraint
+kpm i org.junit.platform:junit-platform-launcher
 
 # Expose a dependency to consumers, or select a platform
 kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2 --api
@@ -151,9 +154,11 @@ kpm uninstall androidx.activity:activity-compose --target android
 
 Omitting `--target` adds to `commonMain` in a Kotlin Multiplatform project, or the main configuration in a Kotlin/JVM or Android project. `--api` exposes a dependency; otherwise new dependencies use `implementation`. Reinstalling an existing dependency preserves its scope unless `--api` or `--implementation` is specified. Flags may appear before or after coordinates, and install/uninstall accept multiple packages.
 
+Bare `group:artifact` coordinates are saved without a version. Gradle must obtain the version from a BOM, a dependency constraint, or another dependency in the graph; resolution fails if no version is supplied. `@latest` is install-command shorthand and is replaced with an exact version in `package.yml`. To keep following future releases on resolution, use Gradle's selector `group:artifact:latest.release`.
+
 KPM preserves the existing manifest structure and expands shorthand lists when explicit targets or scopes are needed. Install and uninstall also resolve dependencies through Gradle; a resolution failure restores the original manifest. Uninstall without a target removes the dependency from every target.
 
-`list` (`ls`) shows declared and resolved versions. `outdated` shows current, wanted (matching the declared version selector), and latest release versions. `update` (`up`) refreshes Gradle resolution within declared constraints without rewriting `package.yml`. An exact version stays pinned unless Gradle conflict resolution selects a higher compatible version. To explicitly move a declaration to the latest release, run `kpm i group:artifact`.
+`list` (`ls`) shows declared and resolved versions. `outdated` shows current, wanted (matching the declared version selector), and latest release versions. `update` (`up`) refreshes Gradle resolution within declared constraints without rewriting `package.yml`. An exact version stays pinned unless Gradle conflict resolution selects a higher compatible version. To explicitly move a declaration to the latest release, run `kpm i group:artifact@latest`.
 
 ```sh
 kpm update org.jetbrains.kotlinx:kotlinx-coroutines-core
@@ -167,7 +172,8 @@ kpm update --save
 | Command | What it does |
 | --- | --- |
 | `kpm install` / `kpm i` | Resolves and downloads declared dependencies through Gradle. |
-| `kpm i group:artifact[:version]` | Installs and saves a dependency; looks up the latest release when version is omitted. |
+| `kpm i group:artifact[:version]` | Installs and saves a dependency; an omitted version is supplied by Gradle constraints. |
+| `kpm i group:artifact@latest` | Looks up the latest release through Gradle and saves its exact version. |
 | `kpm uninstall group:artifact` | Removes a dependency; aliases: `remove`, `rm`. |
 | `kpm list` / `kpm ls` | Shows declared dependencies and resolved versions. |
 | `kpm outdated` | Checks current, wanted, and latest release versions. |
@@ -318,7 +324,7 @@ jobs:
           node-version: '22'
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
-        run: npm install --global @composablehorizons/kpm@0.2.1
+        run: npm install --global @composablehorizons/kpm@0.3.0
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"
       - run: ./gradlew check
@@ -432,6 +438,8 @@ dependencies:
   jvm:
     - org.slf4j:slf4j-api:2.0.17
 ```
+
+Manifest coordinates may use `group:artifact:version` or versionless `group:artifact`. Versionless declarations stay versionless, including during `update --save`; `outdated` reports their current managed version as wanted and independently checks the latest release.
 
 Versions are illustrative. Each target can use a list (implementation) or a mapping with `api` and/or `implementation`. KMP targets map to `<target>Main`; shared source sets such as `iosMain` use `ios`. Targets must already exist in Gradle, and common dependencies are inherited through Kotlin's source-set hierarchy. On standalone JVM/Android projects, explicit `jvm`/`android` targets map to the main configurations. Duplicate coordinates within one target are rejected, even across scopes. Use either a top-level list or a target mapping; keep targets and build settings in Gradle.
 

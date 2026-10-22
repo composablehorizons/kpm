@@ -20,7 +20,7 @@ Usage:
   kpm --version
   kpm version [patch|minor|major|VERSION|from-git]
   kpm publish [--dry-run]
-  kpm install|i [group:artifact[:version] ...] [--target TARGET] [--api|--implementation]
+  kpm install|i [group:artifact[:version]|group:artifact@latest ...] [--target TARGET] [--api|--implementation]
   kpm uninstall|remove|rm group:artifact [...] [--target TARGET]
   kpm list|ls [--target TARGET]
   kpm outdated [group:artifact ...] [--target TARGET]
@@ -28,6 +28,8 @@ Usage:
 
 Dependency commands use the project's Gradle wrapper and repositories.
 install defaults to implementation in commonMain (KMP) or the main source set.
+Omitting a version lets Gradle supply it through a platform or dependency constraint.
+Use group:artifact@latest to look up and save the latest release version.
 update refreshes resolution within declared Gradle version constraints.
 --save also saves resolved exact versions for dependencies already pinned exactly.
 

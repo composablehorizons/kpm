@@ -78,7 +78,7 @@ func coordinates(value string, requireVersion bool) (string, string, error) {
 	version := ""
 	if len(parts) == 3 {
 		version = parts[2]
-		if version == "" || strings.ContainsAny(version, " \t\r\n") {
+		if version == "" || strings.ContainsAny(version, " @\t\r\n") {
 			return "", "", fmt.Errorf("invalid version in %q", value)
 		}
 	}
@@ -98,9 +98,9 @@ func manifestDependencies(root *yaml.Node) ([]dependency, error) {
 		if node.Kind == yaml.SequenceNode {
 			for _, item := range node.Content {
 				if item.Kind != yaml.ScalarNode || item.Tag != "!!str" || item.Anchor != "" {
-					return fmt.Errorf("dependencies must be group:artifact:version strings without anchors")
+					return fmt.Errorf("dependencies must be group:artifact[:version] strings without anchors")
 				}
-				id, version, err := coordinates(item.Value, true)
+				id, version, err := coordinates(item.Value, false)
 				if err != nil {
 					return err
 				}
@@ -300,7 +300,14 @@ func dependencyCommand(dir string, args []string, out, stderr io.Writer) error {
 		return fmt.Errorf("install options require a dependency")
 	}
 	for _, value := range positional {
-		_, v, err := coordinates(value, false)
+		coordinate := value
+		if command == "install" && strings.HasSuffix(value, "@latest") {
+			coordinate = strings.TrimSuffix(value, "@latest")
+			if strings.Count(coordinate, ":") != 1 {
+				return fmt.Errorf("@latest expects group:artifact@latest")
+			}
+		}
+		_, v, err := coordinates(coordinate, false)
 		if err != nil {
 			return err
 		}
@@ -352,14 +359,19 @@ func dependencyCommand(dir string, args []string, out, stderr io.Writer) error {
 		}
 		defaultTarget := info.Target
 		for _, value := range positional {
-			id, version, _ := coordinates(value, false)
-			if version == "" {
+			latest := strings.HasSuffix(value, "@latest")
+			id, version, _ := coordinates(strings.TrimSuffix(value, "@latest"), false)
+			if latest {
 				lookup := map[string]string{"lookup": id + ":latest.release", "target": *target}
 				report, err := gradleDependency(dir, "kpmLookup", lookup, false, out, stderr)
 				if err != nil {
 					return err
 				}
 				version = report.Version
+			}
+			notation := id
+			if version != "" {
+				notation += ":" + version
 			}
 			scope := "implementation"
 			if *api {
@@ -385,18 +397,18 @@ func dependencyCommand(dir string, args []string, out, stderr io.Writer) error {
 				}
 			}
 			if existing != nil && !*api && !*impl {
-				existing.node.Value = id + ":" + version
+				existing.node.Value = notation
 				continue
 			}
 			if existing != nil && existing.Scope == scope {
-				existing.node.Value = id + ":" + version
+				existing.node.Value = notation
 				continue
 			}
 			if existing != nil {
 				removeDependency(*existing)
 			}
 			list := dependencyList(root, *target, scope, defaultTarget)
-			list.Content = append(list.Content, scalar(id+":"+version))
+			list.Content = append(list.Content, scalar(notation))
 		}
 		if err := p.write(); err != nil {
 			return err
@@ -469,7 +481,7 @@ func dependencyCommand(dir string, args []string, out, stderr io.Writer) error {
 		if *save {
 			for _, row := range report.Dependencies {
 				for _, d := range deps {
-					if d.Target == row.Target && d.Scope == row.Scope && d.ID == row.ID && !strings.ContainsAny(d.Declared, "+[](),") && !strings.HasPrefix(d.Declared, "latest.") {
+					if d.Target == row.Target && d.Scope == row.Scope && d.ID == row.ID && d.Declared != "" && !strings.ContainsAny(d.Declared, "+[](),") && !strings.HasPrefix(d.Declared, "latest.") {
 						d.node.Value = d.ID + ":" + row.Current
 					}
 				}

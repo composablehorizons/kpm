@@ -1,6 +1,6 @@
 {
   "name": "@composablehorizons/kpm",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Dependency management, versioning, and Maven Central publishing for Kotlin packages.",
   "license": "MIT",
   "repository": {

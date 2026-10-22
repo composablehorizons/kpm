@@ -64,13 +64,23 @@ final class PackageDependencies {
 
     private void readList(String target, String scope, List<?> list) {
         for (Object value : list) {
-            if (!(value instanceof String notation) || !notation.matches("[^\\s:]+:[^\\s:]+:[^\\s:]+"))
-                throw new GradleException("Dependencies must use group:artifact:version coordinates.");
-            String id = notation.substring(0, notation.lastIndexOf(':'));
-            if (entries.stream().anyMatch(e -> e.target().equals(target) && e.notation().startsWith(id + ":")))
+            if (!(value instanceof String notation) || !notation.matches("[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(:[^\\s:@]+)?"))
+                throw new GradleException("Dependencies must use group:artifact[:version] coordinates.");
+            String id = dependencyId(notation);
+            if (entries.stream().anyMatch(e -> e.target().equals(target) && dependencyId(e.notation()).equals(id)))
                 throw new GradleException("Duplicate dependency " + id + " for target " + target);
             entries.add(new Entry(target, scope, notation));
         }
+    }
+
+    private String dependencyId(String notation) {
+        String[] parts = notation.split(":", 3);
+        return parts[0] + ":" + parts[1];
+    }
+
+    private String declaredVersion(String notation) {
+        String[] parts = notation.split(":", 3);
+        return parts.length == 3 ? parts[2] : "";
     }
 
     private String defaultTarget() {
@@ -138,7 +148,7 @@ final class PackageDependencies {
                 String idFilter = String.valueOf(project.findProperty("kpm.packages") == null ? "" : project.property("kpm.packages"));
                 List<Map<String, String>> rows = new ArrayList<>();
                 for (Entry entry : entries) {
-                    String id = entry.notation().substring(0, entry.notation().lastIndexOf(':'));
+                    String id = dependencyId(entry.notation());
                     if (!targetFilter.isEmpty() && !targetFilter.equals(entry.target().isEmpty() ? defaultTarget() : entry.target())) continue;
                     if (!idFilter.isEmpty() && !List.of(idFilter.split(",")).contains(id)) continue;
                     String config = configuration(entry.target(), entry.scope());
@@ -146,10 +156,10 @@ final class PackageDependencies {
                     if (name.equals("kpmInstall")) for (Configuration candidate : candidates(config)) candidate.resolve();
                     var row = new LinkedHashMap<String, String>();
                     row.put("target", entry.target()); row.put("scope", entry.scope()); row.put("id", id);
-                    row.put("declared", entry.notation().substring(entry.notation().lastIndexOf(':') + 1));
+                    row.put("declared", declaredVersion(entry.notation()));
                     row.put("current", current); row.put("wanted", current);
                     if (outdated) {
-                        row.put("wanted", resolveVersion(resolvable(config), entry.notation()));
+                        row.put("wanted", declaredVersion(entry.notation()).isEmpty() ? current : resolveVersion(resolvable(config), entry.notation()));
                         row.put("latest", resolveVersion(resolvable(config), id + ":latest.release"));
                     }
                     rows.add(row);
