@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, get } from 'node:http';
@@ -71,10 +71,12 @@ test('handles corrupt caches, unwritable directories, and another running check'
   writeFileSync(join(directory, 'update.json'), '{broken');
   expect(prepareUpdateNotification(options(directory))).toBe('');
   expect(existsSync(join(directory, 'update.lock'))).toBe(true);
+  // Use the same clock for the fixture and filesystem, including sub-ms mtimes.
+  utimesSync(join(directory, 'update.lock'), new Date(now), new Date(now));
   // A fresh lock prevents a second process from spawning another worker.
   cache(directory, { checkedAt: 0 });
   let checks = 0;
-  expect(prepareUpdateNotification(options(directory, { now: Date.now(), startCheck() { checks++; } }))).toBe('');
+  expect(prepareUpdateNotification(options(directory, { startCheck() { checks++; } }))).toBe('');
   expect(checks).toBe(0);
   writeFileSync(join(directory, 'not-a-directory'), '');
   expect(prepareUpdateNotification(options(join(directory, 'not-a-directory')))).toBe('');
