@@ -4,16 +4,21 @@ Manage Kotlin dependencies and publish libraries with npm-style commands.
 
 ![Purple KPM wordmark on a white background](assets/readme-banner.png)
 
-Keep your package's dependencies, version, and publishing metadata in one
-`package.yml`. KPM creates version commits and Git tags, and its Gradle plugin
-configures Maven Central publishing and signing for you.
+Add dependencies to Kotlin/JVM, Android, and Kotlin Multiplatform projects from
+the terminal. KPM keeps them in `package.yml` and uses Gradle to resolve them:
 
-For maintainers of Kotlin/JVM and Kotlin Multiplatform libraries. Available on
-macOS, Linux, and Windows, with bundled x64 and ARM64 binaries.
+```sh
+kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core
+kpm list
+```
 
-[Installation](#installation) · [Quick start](#quick-start) · [Examples](#examples) · [Commands](#command-reference) · [Package metadata](#packageyml-reference) · [MIT license](LICENSE)
+Configure KPM once using the [quick start](#quick-start). When you're ready to
+publish a library, add optional [publishing metadata](#advanced-publish-a-library)
+to the same file.
 
-![KPM bumping a library version and publishing it to Maven Central]()
+Available on macOS, Linux, and Windows, with bundled x64 and ARM64 binaries.
+
+[Installation](#installation) · [Quick start](#quick-start) · [Examples](#examples) · [Commands](#command-reference) · [Publishing](#advanced-publish-a-library) · [Package metadata](#packageyml-reference) · [MIT license](LICENSE)
 
 ## Installation
 
@@ -27,9 +32,10 @@ kpm --version
 Requires **Node.js 18+** and npm. The package includes a native binary for each
 supported platform; using the published CLI does not require Go.
 
-Your library needs a Gradle wrapper and JDK 17+. Git is required for version
-commits and tags. Publishing also needs a Maven Central namespace, a Central
-Portal user token, and a GPG signing key; see [publishing credentials](#publishing-credentials).
+Your project needs a Gradle wrapper and JDK 17+. Keep its Kotlin/Android plugins,
+targets, and repositories configured in Gradle. Git is needed for release
+commits and tags; publishing credentials are covered in the
+[advanced publishing example](#advanced-publish-a-library).
 
 ### Updating KPM
 
@@ -45,7 +51,7 @@ Notifications are disabled in CI, when output is redirected, for `--version`, an
 
 ## Quick start
 
-Configure KPM in your library before running package commands.
+Start in an existing Kotlin project with its Gradle wrapper in the project directory.
 
 ### 1. Configure plugin repositories
 
@@ -62,11 +68,17 @@ pluginManagement {
 
 ### 2. Add the Gradle plugin
 
-In `build.gradle.kts`:
+Add KPM alongside your existing Kotlin or Android plugin in `build.gradle.kts`:
 
 ```kotlin
 plugins {
+    // Keep your existing Kotlin/Android plugin here.
     id("com.composables.kpm") version "0.2.1"
+}
+
+repositories {
+    mavenCentral()
+    // Add google() when using AndroidX dependencies.
 }
 ```
 
@@ -75,40 +87,32 @@ plugins {
 Create `package.yml` next to `build.gradle.kts` and replace the example values:
 
 ```yaml
-name: My Kotlin Library
-description: Reusable Kotlin tools for my apps.
-version: 0.1.0-SNAPSHOT
-
-publishing:
-  groupId: com.example
-  artifactId: my-library
-  url: https://github.com/example/my-library
-  licenses:
-    - name: MIT License
-      url: https://github.com/example/my-library/blob/main/LICENSE
-  developers:
-    - id: example
-      name: Example Developer
-      email: developer@example.com
-  scm:
-    connection: scm:git:https://github.com/example/my-library.git
-    developerConnection: scm:git:ssh://git@github.com/example/my-library.git
-    url: https://github.com/example/my-library
+name: My Kotlin Project
+description: Shared Kotlin code for my app.
+version: 0.1.0
 ```
 
-### 4. Verify setup
+### 4. Add a dependency
 
-Run from the directory containing `package.yml`:
+Run from the directory containing `package.yml` and the Gradle wrapper:
 
 ```sh
-kpm version
-kpm publish --dry-run
+kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core
+kpm list
 ```
+
+KPM looks up the latest release through your Gradle repositories, saves its exact
+version under `dependencies` in `package.yml`, and resolves the dependency. It
+uses `implementation` in `commonMain` for a Multiplatform project, or the main
+configuration for Kotlin/JVM and Android. Your next Gradle build or IDE sync
+uses the saved declaration.
+
+No publishing metadata or credentials are needed for dependency management.
 
 ## Features
 
-- **One metadata file:** `package.yml` supplies the version, Maven coordinates,
-  license, developers, and SCM information for the generated POM.
+- **One manifest:** `package.yml` holds dependencies and the package version,
+  with optional publishing metadata for libraries.
 - **Dependency management:** install, uninstall, list, check outdated versions, and update dependencies through Gradle using your project repositories and credentials.
 - **Semantic versioning:** choose `patch`, `minor`, `major`, an exact version, or
   a version from a Git tag.
@@ -158,46 +162,6 @@ kpm update --save
 
 `--save` also writes resolved versions back to exact declarations; dynamic selectors remain intact. Version selectors use Gradle syntax, such as `1.+` or `[1.0,2.0)`, rather than npm's `^` and `~` syntax. Install/uninstall write enabled Gradle dependency locks; update refreshes all enabled locks or uses `--update-locks` for named packages. KPM uses Gradle's dependency cache and lockfiles, without creating a separate package lockfile. Dependency CLI tasks disable the Gradle configuration cache; normal builds still support it.
 
-### Create and publish a release
-
-Configure [publishing credentials](#publishing-credentials) first.
-
-Start with a clean Git working tree:
-
-```sh
-./gradlew check
-kpm version patch
-kpm publish
-```
-
-With the quick-start metadata, `kpm version patch` changes `0.1.0-SNAPSHOT` to `0.1.0`, commits `package.yml`, and creates the annotated tag `v0.1.0`.
-
-`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads them for automatic release on Maven Central. It returns after upload without waiting for Central validation or download availability. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
-
-For later releases, use `patch`, `minor`, `major`, or an exact version:
-
-```sh
-kpm version minor
-kpm version 1.0.0
-```
-
-### Change metadata without a commit or tag
-
-```sh
-kpm version minor --no-git-tag-version
-```
-
-This updates `package.yml` only, so you can review or commit the change yourself.
-
-### Read a version from Git
-
-```sh
-kpm version from-git --no-git-tag-version
-```
-
-This uses the nearest reachable Git tag with the configured prefix removed.
-The default tag prefix is `v`.
-
 ## Command reference
 
 | Command | What it does |
@@ -237,7 +201,75 @@ For all command options, run:
 kpm --help
 ```
 
-## Publishing credentials
+## Advanced: Publish a library
+
+Once dependency management is set up, add a `publishing` block to the same
+`package.yml` to configure Maven Central publication. Keep `name`, `description`,
+`version`, and `dependencies` at the top level. Replace the example coordinates,
+license, developer, and repository details with your library's metadata:
+
+```yaml
+publishing:
+  groupId: com.example
+  artifactId: my-library
+  url: https://github.com/example/my-library
+  licenses:
+    - name: MIT License
+      url: https://github.com/example/my-library/blob/main/LICENSE
+  developers:
+    - id: example
+      name: Example Developer
+      email: developer@example.com
+  scm:
+    connection: scm:git:https://github.com/example/my-library.git
+    developerConnection: scm:git:ssh://git@github.com/example/my-library.git
+    url: https://github.com/example/my-library
+```
+
+KPM reuses the package's top-level name, description, and version for publication.
+Apps and projects that only consume dependencies can omit this block entirely.
+
+### Create and publish a release
+
+Configure [publishing credentials](#publishing-credentials) first.
+
+Start with a clean Git working tree:
+
+```sh
+./gradlew check
+kpm version patch
+kpm publish
+```
+
+For a package starting at `0.1.0-SNAPSHOT`, `kpm version patch` changes it to `0.1.0`, commits `package.yml`, and creates the annotated tag `v0.1.0`.
+
+`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads them for automatic release on Maven Central. It returns after upload without waiting for Central validation or download availability. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
+
+For later releases, use `patch`, `minor`, `major`, or an exact version:
+
+```sh
+kpm version minor
+kpm version 1.0.0
+```
+
+### Change metadata without a commit or tag
+
+```sh
+kpm version minor --no-git-tag-version
+```
+
+This updates `package.yml` only, so you can review or commit the change yourself.
+
+### Read a version from Git
+
+```sh
+kpm version from-git --no-git-tag-version
+```
+
+This uses the nearest reachable Git tag with the configured prefix removed.
+The default tag prefix is `v`.
+
+### Publishing credentials
 
 Before publishing, you'll need a [Maven Central account and registered namespace](https://central.sonatype.org/publish/requirements/), a Central Portal user token, and a GPG signing key.
 
@@ -253,7 +285,7 @@ export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="YOUR_KEY_PASSWORD"
 
 The signing key must be ASCII-armored. The key ID and password depend on your key configuration. Keep credentials out of `package.yml` and version control.
 
-## Release with GitHub Actions
+### Release with GitHub Actions
 
 Install a pinned KPM version in your workflow.
 
@@ -286,7 +318,7 @@ jobs:
           node-version: '22'
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
-        run: npm install --global @composablehorizons/kpm@0.1.0
+        run: npm install --global @composablehorizons/kpm@0.2.1
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"
       - run: ./gradlew check
