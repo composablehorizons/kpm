@@ -1,17 +1,19 @@
 name: Example Kotlin Library
 description: A local consumer of the KPM Gradle plugin.
-groupId: com.example
-artifactId: example-library
 version: 0.1.0-SNAPSHOT
-url: https://example.test
-licenses:
-  - name: MIT License
-    url: https://example.test/LICENSE
-developers:
-  - id: example
-    name: Example Developer
-    email: developer@example.test
-scm:
-  connection: scm:git:https://example.test/example.git
-  developerConnection: scm:git:ssh://example.test/example.git
-  url: https://example.test/example
+
+publishing:
+  groupId: com.example
+  artifactId: example-library
+  url: https://example.test
+  licenses:
+    - name: MIT License
+      url: https://example.test/LICENSE
+  developers:
+    - id: example
+      name: Example Developer
+      email: developer@example.test
+  scm:
+    connection: scm:git:https://example.test/example.git
+    developerConnection: scm:git:ssh://example.test/example.git
+    url: https://example.test/example

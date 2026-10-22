@@ -65,21 +65,23 @@ Create `package.yml` next to `build.gradle.kts` and replace the example values:
 ```yaml
 name: My Kotlin Library
 description: Reusable Kotlin tools for my apps.
-groupId: com.example
-artifactId: my-library
 version: 0.1.0-SNAPSHOT
-url: https://github.com/example/my-library
-licenses:
-  - name: MIT License
-    url: https://github.com/example/my-library/blob/main/LICENSE
-developers:
-  - id: example
-    name: Example Developer
-    email: developer@example.com
-scm:
-  connection: scm:git:https://github.com/example/my-library.git
-  developerConnection: scm:git:ssh://git@github.com/example/my-library.git
+
+publishing:
+  groupId: com.example
+  artifactId: my-library
   url: https://github.com/example/my-library
+  licenses:
+    - name: MIT License
+      url: https://github.com/example/my-library/blob/main/LICENSE
+  developers:
+    - id: example
+      name: Example Developer
+      email: developer@example.com
+  scm:
+    connection: scm:git:https://github.com/example/my-library.git
+    developerConnection: scm:git:ssh://git@github.com/example/my-library.git
+    url: https://github.com/example/my-library
 ```
 
 ### 4. Verify setup
@@ -251,35 +253,37 @@ git push --follow-tags
 
 ## package.yml reference
 
-This example includes every supported field:
+This example includes every supported publishing field:
 
 ```yaml
 name: My Kotlin Library
 description: Reusable Kotlin tools for my apps.
-groupId: com.example
-artifactId: my-library
 version: 0.1.0
-url: https://github.com/example/my-library
 
-licenses:
-  - name: MIT License
-    url: https://github.com/example/my-library/blob/main/LICENSE
-    distribution: repo # Optional
-
-developers:
-  - id: example
-    name: Example Developer
-    email: developer@example.com # Optional
-    url: https://github.com/example # Optional
-
-scm:
-  connection: scm:git:https://github.com/example/my-library.git
-  developerConnection: scm:git:ssh://git@github.com/example/my-library.git
+publishing:
+  groupId: com.example
+  artifactId: my-library
   url: https://github.com/example/my-library
 
-issueManagement: # Optional; include both fields when present
-  system: GitHub Issues
-  url: https://github.com/example/my-library/issues
+  licenses:
+    - name: MIT License
+      url: https://github.com/example/my-library/blob/main/LICENSE
+      distribution: repo # Optional
+
+  developers:
+    - id: example
+      name: Example Developer
+      email: developer@example.com # Optional
+      url: https://github.com/example # Optional
+
+  scm:
+    connection: scm:git:https://github.com/example/my-library.git
+    developerConnection: scm:git:ssh://git@github.com/example/my-library.git
+    url: https://github.com/example/my-library
+
+  issueManagement: # Optional; include both fields when present
+    system: GitHub Issues
+    url: https://github.com/example/my-library/issues
 ```
 
 ### Fields
@@ -288,26 +292,30 @@ issueManagement: # Optional; include both fields when present
 | --- | --- | --- |
 | `name` | Yes | Display name of the library. |
 | `description` | Yes | Summary of what the library does. |
-| `groupId` | Yes | Maven namespace, such as `com.example`. Also sets the Gradle project group. |
-| `artifactId` | Yes | Maven artifact name, such as `my-library`. |
+| `publishing.groupId` | Yes | Maven namespace, such as `com.example`. Also sets the Gradle project group. |
+| `publishing.artifactId` | Yes | Maven artifact name, such as `my-library`. |
 | `version` | Yes | Package version in semantic version format, such as `1.2.3` or `1.2.3-SNAPSHOT`. Also sets the Gradle project version. |
-| `url` | Yes | Library homepage or repository URL. |
-| `licenses` | Yes | A list containing at least one license. |
-| `licenses[].name` | Yes | License name. |
-| `licenses[].url` | Yes | URL of the license text. |
-| `licenses[].distribution` | No | Maven license distribution value, commonly `repo`. |
-| `developers` | Yes | A list containing at least one developer. |
-| `developers[].id` | Yes | Developer identifier, such as a GitHub username. |
-| `developers[].name` | Yes | Developer or organization display name. |
-| `developers[].email` | No | Developer contact email. |
-| `developers[].url` | No | Developer website or profile URL. |
-| `scm` | Yes | Source repository details. |
-| `scm.connection` | Yes | Read-only SCM connection, such as `scm:git:https://github.com/example/my-library.git`. |
-| `scm.developerConnection` | Yes | Developer SCM connection, such as `scm:git:ssh://git@github.com/example/my-library.git`. |
-| `scm.url` | Yes | Browser URL for the source repository. |
-| `issueManagement` | No | Issue tracker details. |
-| `issueManagement.system` | When `issueManagement` is present | Tracker name, such as `GitHub Issues`. |
-| `issueManagement.url` | When `issueManagement` is present | URL of the issue tracker. |
+| `publishing.url` | Yes | Library homepage or repository URL. |
+| `publishing.licenses` | Yes | A list containing at least one license. |
+| `publishing.licenses[].name` | Yes | License name. |
+| `publishing.licenses[].url` | Yes | URL of the license text. |
+| `publishing.licenses[].distribution` | No | Maven license distribution value, commonly `repo`. |
+| `publishing.developers` | Yes | A list containing at least one developer. |
+| `publishing.developers[].id` | Yes | Developer identifier, such as a GitHub username. |
+| `publishing.developers[].name` | Yes | Developer or organization display name. |
+| `publishing.developers[].email` | No | Developer contact email. |
+| `publishing.developers[].url` | No | Developer website or profile URL. |
+| `publishing.scm` | Yes | Source repository details. |
+| `publishing.scm.connection` | Yes | Read-only SCM connection, such as `scm:git:https://github.com/example/my-library.git`. |
+| `publishing.scm.developerConnection` | Yes | Developer SCM connection, such as `scm:git:ssh://git@github.com/example/my-library.git`. |
+| `publishing.scm.url` | Yes | Browser URL for the source repository. |
+| `publishing.issueManagement` | No | Issue tracker details. |
+| `publishing.issueManagement.system` | When `publishing.issueManagement` is present | Tracker name, such as `GitHub Issues`. |
+| `publishing.issueManagement.url` | When `publishing.issueManagement` is present | URL of the issue tracker. |
+
+The `publishing` block is optional. When omitted, KPM sets the package version without configuring Maven publishing. The fields marked required inside `publishing` are required only when publishing is configured. `name`, `description`, and `version` remain at the top level.
+
+Existing top-level publishing fields remain supported until 1.0.0 and produce a deprecation warning. Move them under `publishing` to migrate. If both formats are present, the nested block takes precedence as a whole; KPM does not merge the formats.
 
 All text fields must be non-empty strings when supplied. Add multiple entries under `licenses` or `developers` as needed. Publishing metadata is written to the generated Maven POM.
 

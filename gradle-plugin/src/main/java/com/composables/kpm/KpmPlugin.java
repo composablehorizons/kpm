@@ -33,8 +33,12 @@ public final class KpmPlugin implements Plugin<Project> {
             throw new GradleException("Invalid package.yml: " + error.getMessage(), error);
         }
 
-        project.setGroup(metadata.groupId);
         project.setVersion(metadata.version);
+        if (!metadata.publishing) return;
+        if (metadata.legacyPublishing) {
+            project.getLogger().warn("KPM: top-level publishing metadata is deprecated and will be removed in 1.0.0; move it into a publishing block.");
+        }
+        project.setGroup(metadata.groupId);
         project.getPluginManager().apply("com.vanniktech.maven.publish");
         var publishing = project.getExtensions().getByType(MavenPublishBaseExtension.class);
         publishing.coordinates(metadata.groupId, metadata.artifactId, metadata.version);
@@ -98,25 +102,37 @@ public final class KpmPlugin implements Plugin<Project> {
         final String groupId, artifactId, version, name, description, url;
         final List<Map<?, ?>> licenses, developers;
         final Map<?, ?> scm, issues;
+        final boolean publishing, legacyPublishing;
 
         Metadata(Map<?, ?> values) {
             if (values.containsKey("dependencies")) {
                 throw new GradleException("KPM dependency declarations are not supported yet; keep dependencies in Gradle.");
             }
-            groupId = text(values, "groupId");
-            artifactId = text(values, "artifactId");
             version = text(values, "version");
             if (!version.matches("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?")) {
                 throw new GradleException("package.yml version must be a semantic version, such as 0.1.0.");
             }
             name = text(values, "name");
             description = text(values, "description");
-            url = text(values, "url");
-            licenses = entries(values, "licenses", "name", "url");
-            developers = entries(values, "developers", "id", "name");
-            scm = mapping(values.get("scm"), "scm");
+            legacyPublishing = !values.containsKey("publishing") && List.of(
+                "groupId", "artifactId", "url", "licenses", "developers", "scm", "issueManagement"
+            ).stream().anyMatch(values::containsKey);
+            publishing = values.containsKey("publishing") || legacyPublishing;
+            if (!publishing) {
+                groupId = artifactId = url = null;
+                licenses = developers = List.of();
+                scm = issues = null;
+                return;
+            }
+            var publication = legacyPublishing ? values : mapping(values.get("publishing"), "publishing");
+            groupId = text(publication, "groupId");
+            artifactId = text(publication, "artifactId");
+            url = text(publication, "url");
+            licenses = entries(publication, "licenses", "name", "url");
+            developers = entries(publication, "developers", "id", "name");
+            scm = mapping(publication.get("scm"), "scm");
             for (String key : List.of("connection", "developerConnection", "url")) text(scm, key);
-            issues = values.containsKey("issueManagement") ? mapping(values.get("issueManagement"), "issueManagement") : null;
+            issues = publication.containsKey("issueManagement") ? mapping(publication.get("issueManagement"), "issueManagement") : null;
             if (issues != null) { text(issues, "system"); text(issues, "url"); }
         }
     }
