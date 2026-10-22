@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Use npm’s registry retries when checking publication state instead of a single 15-second request. Treat only an explicit `E404` as an unpublished version, so releases can safely resume after temporary registry failures.
+
 ## [0.3.0] - 2026-10-22
 
 ### Changed

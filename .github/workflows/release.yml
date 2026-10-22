@@ -108,16 +108,23 @@ jobs:
           path: build/npm-release
       - name: Check whether this npm version is already published
         id: registry
+        env:
+          # npm retries registry reads; a one-shot fetch bypasses that recovery.
+          NPM_CONFIG_FETCH_RETRIES: '2'
+          NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: '10000'
+          NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: '60000'
+          NPM_CONFIG_FETCH_TIMEOUT: '60000'
         run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const { name, version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`, {
-            signal: AbortSignal.timeout(15000),
-          });
-          if (response.status !== 404 && !response.ok) throw new Error(`npm registry returned ${response.status}`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `exists=${response.status !== 404}\n`);
-          JS
+          package_spec="$(node -p 'const p = require("./package.json"); p.name + "@" + p.version')"
+          if output=$(npm view "$package_spec" version --prefer-online 2>&1); then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          elif grep -Eq '^npm (ERR!|error) code E404$' <<< "$output"; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Could not determine npm publication state after npm registry retries.'
+            printf '%s\n' "$output" >&2
+            exit 1
+          fi
       - name: Publish the verified archive using npm trusted publishing
         if: steps.registry.outputs.exists != 'true'
         env:

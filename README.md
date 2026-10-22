@@ -503,7 +503,7 @@ npm trust github @composablehorizons/kpm --repo composablehorizons/kpm --file re
 
 This configuration step may require a one-time security-key approval. Subsequent GitHub releases authenticate through OIDC without local npm login or per-release authentication prompts.
 
-For recovery, dispatch the current workflow from `main` and select the existing release tag. Its `publish_npm` and `publish_maven` inputs let you retry one registry without repeating the other upload. Existing npm versions and GitHub releases are skipped. Maven Central processes accepted uploads asynchronously; disable `publish_maven` if that version was already accepted, even when it is not yet downloadable. Do not move a published tag.
+For recovery, dispatch the current workflow from `main` and select the existing release tag. Its `publish_npm` and `publish_maven` inputs let you retry one registry without repeating the other upload. The npm publication check uses `npm view` with two retries for temporary network/server failures and a 60-second request timeout. Only an explicit npm `E404` means the version is missing; other failures stop publication. Existing npm versions and GitHub releases are skipped. Maven Central processes accepted uploads asynchronously; disable `publish_maven` if that version was already accepted, even when it is not yet downloadable. Do not move a published tag.
 
 For example, finish only the npm publication of `v0.2.1`:
 
