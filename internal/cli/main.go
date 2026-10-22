@@ -14,12 +14,22 @@ import (
 
 var binaryVersion = "dev"
 
-const usage = `kpm — version and publish libraries to Maven Central
+const usage = `kpm — manage dependencies, version packages, and publish to Maven Central
 
 Usage:
   kpm --version
   kpm version [patch|minor|major|VERSION|from-git]
   kpm publish [--dry-run]
+  kpm install|i [group:artifact[:version] ...] [--target TARGET] [--api|--implementation]
+  kpm uninstall|remove|rm group:artifact [...] [--target TARGET]
+  kpm list|ls [--target TARGET]
+  kpm outdated [group:artifact ...] [--target TARGET]
+  kpm update|up [group:artifact ...] [--target TARGET] [--save]
+
+Dependency commands use the project's Gradle wrapper and repositories.
+install defaults to implementation in commonMain (KMP) or the main source set.
+update refreshes resolution within declared Gradle version constraints.
+--save also saves resolved exact versions for dependencies already pinned exactly.
 
 Version options (before or after the version):
   --no-git-tag-version      Update package.yml without a commit or tag
@@ -62,12 +72,15 @@ func run(dir string, args []string, out, stderr io.Writer) error {
 		_, _ = io.WriteString(out, usage)
 		return nil
 	}
-	if args[0] != "version" && args[0] != "publish" {
+	if !isDependencyCommand(args[0]) && args[0] != "version" && args[0] != "publish" {
 		return fmt.Errorf("unknown command %q; use kpm --help", args[0])
 	}
 	root, err := findPackage(dir)
 	if err != nil {
 		return err
+	}
+	if isDependencyCommand(args[0]) {
+		return dependencyCommand(root, args, out, stderr)
 	}
 	if args[0] == "version" {
 		return versionCommand(root, args[1:], out, stderr)

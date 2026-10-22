@@ -104,12 +104,71 @@ public class KpmPluginTest {
             .buildAndFail().getOutput().contains("artifactId"));
     }
 
+    private void localArtifact(Path repository, String version) throws Exception {
+        Path directory = repository.resolve("example/tool/" + version);
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve("tool-" + version + ".pom"),
+            "<project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>tool</artifactId><version>" + version + "</version></project>");
+        try (var jar = new java.util.jar.JarOutputStream(Files.newOutputStream(directory.resolve("tool-" + version + ".jar")))) {}
+    }
+
+    @Test public void resolvesInstallsListsAndLooksUpVersionsFromProjectRepositories() throws Exception {
+        Path root = project("name: Example\ndescription: Example app\nversion: 1.2.3\ndependencies:\n  - example:tool:1.0.0\n");
+        Path repo = root.resolve("repo");
+        localArtifact(repo, "1.0.0"); localArtifact(repo, "1.1.0");
+        Files.writeString(repo.resolve("example/tool/maven-metadata.xml"),
+            "<metadata><groupId>example</groupId><artifactId>tool</artifactId><versioning><latest>1.1.0</latest><release>1.1.0</release><versions><version>1.0.0</version><version>1.1.0</version></versions></versioning></metadata>");
+        Files.writeString(root.resolve("build.gradle"), "plugins { id 'com.composables.kpm'; id 'java-library' }\nrepositories { maven { url = uri('repo') } }\n");
+        Path report = root.resolve("report.json");
+        runner(root, "kpmInstall", "--no-configuration-cache", "-Pkpm.report=" + report).build();
+        assertTrue(Files.readString(report).contains("\"current\":\"1.0.0\""));
+        runner(root, "kpmList", "--no-configuration-cache", "-Pkpm.target=jvm", "-Pkpm.report=" + report).build();
+        assertTrue(Files.readString(report).contains("example:tool"));
+        runner(root, "kpmOutdated", "--no-configuration-cache", "-Pkpm.report=" + report).build();
+        String outdated = Files.readString(report);
+        assertTrue(outdated.contains("\"latest\":\"1.1.0\""));
+        assertTrue(outdated.contains("\"wanted\":\"1.0.0\""));
+        runner(root, "kpmLookup", "--no-configuration-cache", "-Pkpm.lookup=example:tool:latest.release", "-Pkpm.report=" + report).build();
+        assertTrue(Files.readString(report).contains("\"version\":\"1.1.0\""));
+        Files.writeString(root.resolve("package.yml"), Files.readString(root.resolve("package.yml")).replace("example:tool:1.0.0", "example:tool:1.+"));
+        runner(root, "kpmInstall", "--refresh-dependencies", "--no-configuration-cache", "-Pkpm.report=" + report).build();
+        assertTrue(Files.readString(report).contains("\"current\":\"1.1.0\""));
+    }
+
+    @Test public void attachesExplicitScopesToGradleAndRejectsMissingTargets() throws Exception {
+        Path root = project("name: Example\ndescription: Example\nversion: 1.2.3\ndependencies:\n  jvm:\n    api: [example:public:1.0]\n    implementation: [example:internal:1.0]\n");
+        Files.writeString(root.resolve("build.gradle"), "plugins { id 'com.composables.kpm'; id 'java-library' }\nafterEvaluate { assert configurations.api.dependencies*.name == ['public']; assert configurations.implementation.dependencies*.name == ['internal'] }\n");
+        runner(root, "help", "--configuration-cache").build();
+        assertTrue(runner(root, "help", "--configuration-cache").build().getOutput().contains("Reusing configuration cache"));
+        Files.writeString(root.resolve("package.yml"), Files.readString(root.resolve("package.yml")).replace("jvm:", "android:"));
+        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("does not exist"));
+    }
+
+    @Test public void configuresRealKotlinMultiplatformSourceSets() throws Exception {
+        Path root = project("name: Example\ndescription: Example\nversion: 1.2.3\ndependencies:\n  common:\n    api: [example:public:1.0]\n  jvm: [example:internal:1.0]\n");
+        Files.writeString(root.resolve("settings.gradle"), "pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }\nrootProject.name = 'example'\n");
+        Files.writeString(root.resolve("build.gradle"),
+            "plugins { id 'com.composables.kpm'; id 'org.jetbrains.kotlin.multiplatform' version '2.4.0' }\n"
+            + "kotlin { jvm() }\n"
+            + "afterEvaluate { assert configurations.commonMainApi.dependencies*.name.contains('public'); assert configurations.jvmMainImplementation.dependencies*.name.contains('internal') }\n");
+        runner(root, "help", "--configuration-cache").build();
+        assertTrue(runner(root, "help", "--configuration-cache").build().getOutput().contains("Reusing configuration cache"));
+        Files.writeString(root.resolve("package.yml"), "name: Example\ndescription: Example\nversion: 1.2.3\ndependencies: [example:tool:1.0.0]\n");
+        Files.writeString(root.resolve("build.gradle"), "plugins { id 'org.jetbrains.kotlin.multiplatform' version '2.4.0'; id 'com.composables.kpm' }\nkotlin { jvm() }\nafterEvaluate { assert configurations.commonMainImplementation.dependencies*.name.contains('tool') }\n");
+        runner(root, "help").build();
+        Files.writeString(root.resolve("package.yml"), "name: Example\ndescription: Example\nversion: 1.2.3\ndependencies: [org.jetbrains.kotlin:kotlin-stdlib:2.4.0]\n");
+        Files.writeString(root.resolve("build.gradle"), "plugins { id 'org.jetbrains.kotlin.multiplatform' version '2.4.0'; id 'com.composables.kpm' }\nrepositories { mavenCentral() }\nkotlin { jvm() }\n");
+        Path report = root.resolve("report.json");
+        runner(root, "kpmInstall", "--no-configuration-cache", "-Pkpm.report=" + report).build();
+        assertTrue(Files.readString(report).contains("\"current\":\"2.4.0\""));
+    }
+
     @Test public void rejectsMissingMetadata() throws Exception {
         assertTrue(runner(project(null), "help").buildAndFail().getOutput().contains("KPM requires package.yml"));
     }
 
-    @Test public void rejectsDuplicateMetadataAndUnimplementedDependencies() throws Exception {
+    @Test public void rejectsDuplicateMetadataAndInvalidDependencies() throws Exception {
         assertTrue(runner(project(METADATA + "version: 2.0.0\n"), "help").buildAndFail().getOutput().contains("Invalid package.yml"));
-        assertTrue(runner(project(METADATA + "dependencies: {}\n"), "help").buildAndFail().getOutput().contains("not supported yet"));
+        assertTrue(runner(project(METADATA + "dependencies:\n  common:\n    runtimeOnly: []\n"), "help").buildAndFail().getOutput().contains("Unsupported dependency scope"));
     }
 }

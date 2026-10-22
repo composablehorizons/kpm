@@ -12,7 +12,7 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
-/** Connect package metadata to Gradle without owning targets or dependencies. */
+/** Connect package metadata to Gradle without owning targets. */
 public final class KpmPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
@@ -21,18 +21,24 @@ public final class KpmPlugin implements Plugin<Project> {
             throw new GradleException("KPM requires package.yml next to this project's build.gradle(.kts).");
         }
         Metadata metadata;
+        Map<?, ?> values;
         try {
             var options = new LoaderOptions();
             options.setAllowDuplicateKeys(false);
             var yaml = new Yaml(new SafeConstructor(options));
             Object document = yaml.load(project.getProviders().fileContents(file).getAsText().get());
-            metadata = new Metadata(mapping(document, "package.yml"));
+            values = mapping(document, "package.yml");
+            metadata = new Metadata(values);
         } catch (GradleException error) {
             throw error;
         } catch (RuntimeException error) {
             throw new GradleException("Invalid package.yml: " + error.getMessage(), error);
         }
 
+        if (values.containsKey("dependencies") && values.get("dependencies") == null) {
+            throw new GradleException("dependencies must be a list or a mapping of targets.");
+        }
+        new PackageDependencies(project, values.get("dependencies"));
         project.setVersion(metadata.version);
         if (!metadata.publishing) return;
         if (metadata.legacyPublishing) {
@@ -105,9 +111,6 @@ public final class KpmPlugin implements Plugin<Project> {
         final boolean publishing, legacyPublishing;
 
         Metadata(Map<?, ?> values) {
-            if (values.containsKey("dependencies")) {
-                throw new GradleException("KPM dependency declarations are not supported yet; keep dependencies in Gradle.");
-            }
             version = text(values, "version");
             if (!version.matches("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?")) {
                 throw new GradleException("package.yml version must be a semantic version, such as 0.1.0.");

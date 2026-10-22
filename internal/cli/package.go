@@ -62,6 +62,10 @@ func readPackage(dir string) (*packageFile, error) {
 
 func (p *packageFile) writeVersion(version string) error {
 	p.version.Value = version
+	return p.write()
+}
+
+func (p *packageFile) write() error {
 	var buf bytes.Buffer
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
