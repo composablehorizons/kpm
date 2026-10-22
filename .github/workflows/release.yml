@@ -1,29 +1,146 @@
-name: Release Maven plugin
+name: Release
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, e.g. v0.2.1
+        required: true
+        type: string
+      publish_npm:
+        description: Publish the npm CLI (skip if this version already exists)
+        type: boolean
+        default: true
+      publish_maven:
+        description: Publish Maven artifacts (disable when retrying an accepted upload)
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
-  group: release-maven
+  group: release
   cancel-in-progress: false
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist_tag: ${{ steps.version.outputs.dist_tag }}
+      archive: ${{ steps.pack.outputs.archive }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Verify release tag
-        run: test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')"
+      - name: Verify release tag and requested registries
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_NPM: ${{ inputs.publish_npm }}
+          PUBLISH_MAVEN: ${{ inputs.publish_maven }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (process.env.RELEASE_TAG !== `v${version}`) throw new Error('Release tag must match package.json version');
+          if (process.env.EVENT_NAME === 'workflow_dispatch' && process.env.PUBLISH_NPM !== 'true' && process.env.PUBLISH_MAVEN !== 'true') {
+            throw new Error('Select at least one registry to publish');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\ndist_tag=${version.includes('-') ? 'next' : 'latest'}\n`);
+          JS
+      - run: go test ./...
+      - run: bun run build
+      - run: bun test npm
       - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - name: Verify Kotlin Multiplatform consumer
+        run: ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
+      - name: Pack and verify the npm artifact
+        id: pack
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          archive="$(npm pack --ignore-scripts --silent)"
+          npm install --prefix build/npm-release-check --ignore-scripts --no-audit --no-fund "./$archive"
+          actual="$(node build/npm-release-check/node_modules/@composablehorizons/kpm/bin/kpm.cjs --version)"
+          test "$actual" = "$EXPECTED_VERSION"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: ${{ steps.pack.outputs.archive }}
+          if-no-files-found: error
+          retention-days: 7
+
+  npm:
+    needs: verify
+    if: github.event_name == 'push' || inputs.publish_npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@12.2.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: build/npm-release
+      - name: Check whether this npm version is already published
+        id: registry
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const { name, version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`, {
+            signal: AbortSignal.timeout(15000),
+          });
+          if (response.status !== 404 && !response.ok) throw new Error(`npm registry returned ${response.status}`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `exists=${response.status !== 404}\n`);
+          JS
+      - name: Publish the verified archive using npm trusted publishing
+        if: steps.registry.outputs.exists != 'true'
+        env:
+          ARCHIVE: ${{ needs.verify.outputs.archive }}
+          DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
+        run: npm publish "build/npm-release/$ARCHIVE" --access public --tag "$DIST_TAG" --ignore-scripts
+      - name: Report existing npm publication
+        if: steps.registry.outputs.exists == 'true'
+        run: echo 'This npm version is already published; leaving the immutable release unchanged.'
+
+  maven:
+    needs: verify
+    if: github.event_name == 'push' || inputs.publish_maven
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
       - name: Publish plugin and marker to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
@@ -32,3 +149,30 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew :gradle-plugin:publishAllPublicationsToMavenCentral --no-configuration-cache --console=plain
+
+  github-release:
+    needs: [verify, npm, maven]
+    if: >-
+      always() && needs.verify.result == 'success' &&
+      (needs.npm.result == 'success' || needs.npm.result == 'skipped') &&
+      (needs.maven.result == 'success' || needs.maven.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Create the GitHub release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'GitHub release already exists.'
+          else
+            flags=()
+            if [ "$DIST_TAG" = next ]; then flags+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --generate-notes "${flags[@]}"
+          fi

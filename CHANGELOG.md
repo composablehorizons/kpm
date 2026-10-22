@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Publish the npm CLI, Maven plugin, and GitHub release through the GitHub Actions release workflow. npm uses trusted publishing; manual recovery can target one registry without repeating an accepted Maven upload.
+
 ## [0.2.1] - 2026-10-22
 
 ### Added
