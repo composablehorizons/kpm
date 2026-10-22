@@ -107,5 +107,15 @@ test('a stalled detached update check cannot hold the command open', async () =>
     const deadline = Date.now() + 4000;
     while (!existsSync(completed) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
     expect(existsSync(completed)).toBe(true);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally {
+    // On Windows, a detached worker briefly holds its current directory open
+    // after writing the completion marker. Let it exit before removing it.
+    for (let attempt = 0; ; attempt++) {
+      try { rmSync(directory, { recursive: true, force: true }); break; }
+      catch (error) {
+        if (attempt >= 40 || !['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(error.code)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    }
+  }
 });
