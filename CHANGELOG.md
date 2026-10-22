@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
+### Added
+
+- npm-style dependency commands: `install` (`i`), `uninstall` (`remove`, `rm`), `list` (`ls`), `outdated`, and `update` (`up`).
+- `--target`, `--api`, and `--implementation` options, with shorthand and scoped dependency declarations in `package.yml`.
+- Gradle dependency resolution, version lookup, and enabled dependency-lock updates using project repositories and credentials.
+- An optional nested `publishing` block. Packages without publishing metadata can use KPM for dependency management.
+
+### Deprecated
+
+- Top-level publishing fields remain supported with a warning and will be removed in 1.0.0. Move them under `publishing`; package name, description, and version stay at the top level.
+
 ## [0.1.1] - 2026-10-21
 
 ### Changed

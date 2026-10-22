@@ -16,7 +16,7 @@ gradlePlugin {
             id = "com.composables.kpm"
             implementationClass = "com.composables.kpm.KpmPlugin"
             displayName = "Kotlin Package Manager"
-            description = "Read package.yml and configure Kotlin library publication."
+            description = "Read package.yml to manage dependencies and configure Kotlin library publication."
         }
     }
 }
@@ -39,7 +39,7 @@ mavenPublishing {
     }
     pom {
         name.set("KPM")
-        description.set("Package versioning and Maven Central publishing for Kotlin libraries.")
+        description.set("Dependency management, versioning, and Maven Central publishing for Kotlin packages.")
         url.set("https://github.com/composablehorizons/kpm")
         licenses {
             license {

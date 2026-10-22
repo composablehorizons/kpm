@@ -54,7 +54,7 @@ In `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("com.composables.kpm") version "0.1.1"
+    id("com.composables.kpm") version "0.2.0"
 }
 ```
 
