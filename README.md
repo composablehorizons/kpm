@@ -31,6 +31,18 @@ Your library needs a Gradle wrapper and JDK 17+. Git is required for version
 commits and tags. Publishing also needs a Maven Central namespace, a Central
 Portal user token, and a GPG signing key; see [publishing credentials](#publishing-credentials).
 
+### Updating KPM
+
+Update the CLI with:
+
+```sh
+npm install -g @composablehorizons/kpm@latest
+```
+
+In an interactive terminal, the npm launcher checks for a newer stable CLI version at most once every 24 hours. The check runs in a detached background process with a two-second network deadline. Commands never wait for the response; a later invocation displays the cached update notice on stderr, at most once per day per discovered version. Offline, registry, and cache errors are silently ignored and never change the command's result.
+
+Notifications are disabled in CI, when output is redirected, for `--version`, and when `KPM_NO_UPDATE_NOTIFIER=1` or `NO_UPDATE_NOTIFIER=1` is set. `kpm update` updates project dependencies; updating the Gradle plugin version remains a separate change to your build file.
+
 ## Quick start
 
 Configure KPM in your library before running package commands.
@@ -54,7 +66,7 @@ In `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("com.composables.kpm") version "0.2.0"
+    id("com.composables.kpm") version "0.2.1"
 }
 ```
 

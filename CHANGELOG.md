@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-22
+
+### Added
+
+- A daily background update check in the npm launcher, with cached terminal notices and an npm upgrade command. Update checks never wait on the network in the foreground or affect command exit status, and can be disabled with `KPM_NO_UPDATE_NOTIFIER=1`.
+
 ## [0.2.0] - 2026-10-22
 
 ### Added
