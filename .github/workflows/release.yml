@@ -170,7 +170,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Create the GitHub release if missing
+      - name: Create the draft GitHub release if missing
         env:
           GH_TOKEN: ${{ github.token }}
           DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
@@ -180,5 +180,5 @@ jobs:
           else
             flags=()
             if [ "$DIST_TAG" = next ]; then flags+=(--prerelease); fi
-            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --generate-notes "${flags[@]}"
+            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --draft --generate-notes "${flags[@]}"
           fi

@@ -528,28 +528,7 @@ through an included build. Check its JVM/Wasm compilation and generated POMs wit
 ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
 ```
 
-### Releasing KPM itself
-
-All production publishing runs in [the Release workflow](.github/workflows/release.yml): the npm CLI, the Maven plugin and marker, and the GitHub release. Local work prepares the version commit and `v<version>` tag; pushing that tag starts the workflow. Do not run `npm publish` or the Gradle production publishing task locally.
-
-The workflow checks out the immutable tag, verifies it matches `package.json`, builds all six native binaries, runs CLI and Gradle checks, and verifies installation of the packed npm archive. It publishes that exact archive with npm trusted publishing and uploads the Maven publications using the existing signing/Central secrets. GitHub release creation follows successful publication jobs. Prerelease npm versions use the `next` dist-tag; stable versions use `latest`.
-
-One-time npm setup: authorize GitHub repository `composablehorizons/kpm`, workflow filename `release.yml`, to publish `@composablehorizons/kpm`. Use [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) with direct `npm publish` allowed; the workflow has `id-token: write` and needs no `NPM_TOKEN` secret. A maintainer can configure this in npm package settings or with:
-
-```sh
-npm trust github @composablehorizons/kpm --repo composablehorizons/kpm --file release.yml --allow-publish --yes
-```
-
-This configuration step may require a one-time security-key approval. Subsequent GitHub releases authenticate through OIDC without local npm login or per-release authentication prompts.
-
-For recovery, dispatch the current workflow from `main` and select the existing release tag. Its `publish_npm` and `publish_maven` inputs let you retry one registry without repeating the other upload. The npm publication check uses `npm view` with two retries for temporary network/server failures and a 60-second request timeout. Only an explicit npm `E404` means the version is missing; other failures stop publication. Existing npm versions and GitHub releases are skipped. Maven Central processes accepted uploads asynchronously; disable `publish_maven` if that version was already accepted, even when it is not yet downloadable. Do not move a published tag.
-
-For example, finish only the npm publication of `v0.2.1`:
-
-```sh
-gh workflow run release.yml --ref main \
-  -f tag=v0.2.1 -f publish_npm=true -f publish_maven=false
-```
+For the maintainer release process, see [RELEASING.md](RELEASING.md).
 
 Report reproducible bugs or propose changes through the repository's issues and
 pull requests. Include the command, relevant `package.yml` fields, and platform
