@@ -9,12 +9,12 @@ if ($env:OS -ne 'Windows_NT') { throw 'Use scripts/install.sh on macOS and Linux
 if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\kpm\bin' }
 $releaseBase = 'https://github.com/composablehorizons/kpm/releases'
 if ($env:KPM_RELEASE_BASE_URL) { $releaseBase = $env:KPM_RELEASE_BASE_URL.TrimEnd('/') }
-$architecture = $env:PROCESSOR_ARCHITEW6432
-if (-not $architecture) { $architecture = $env:PROCESSOR_ARCHITECTURE }
+# Detect the operating system architecture even from an emulated/32-bit shell.
+$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
 switch ($architecture) {
-    'AMD64' { $arch = 'amd64' }
-    'ARM64' { $arch = 'arm64' }
-    default { throw 'Unsupported architecture. KPM provides Windows x64 and ARM64 binaries.' }
+    'X64' { $arch = 'amd64' }
+    'Arm64' { $arch = 'arm64' }
+    default { throw "Unsupported architecture '$architecture'. KPM provides Windows x64 and ARM64 binaries." }
 }
 # Windows PowerShell 5.1 may otherwise default to older TLS versions.
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12

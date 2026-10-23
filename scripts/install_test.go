@@ -189,10 +189,10 @@ func TestPowerShellInstaller(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, badChecksum := range []bool{false, true} {
-		server := releaseFixture(t, "kpm_0.4.0_windows_amd64.zip", buffer.Bytes(), badChecksum)
+		server := releaseFixture(t, "kpm_0.4.0_windows_"+runtime.GOARCH+".zip", buffer.Bytes(), badChecksum)
 		target := filepath.Join(t.TempDir(), "bin with spaces")
 		command := exec.Command(shell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "install.ps1", "-InstallDir", target, "-NoPath")
-		command.Env = append(os.Environ(), "KPM_RELEASE_BASE_URL="+server.URL, "KPM_VERSION=", "PROCESSOR_ARCHITECTURE=AMD64", "PROCESSOR_ARCHITEW6432=")
+		command.Env = append(os.Environ(), "KPM_RELEASE_BASE_URL="+server.URL, "KPM_VERSION=")
 		output, err := command.CombinedOutput()
 		if badChecksum {
 			if err == nil {
