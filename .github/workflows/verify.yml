@@ -38,7 +38,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
       - uses: gradle/actions/setup-gradle@v5
       - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - name: Verify initialization and module commands
+        run: go test ./internal/cli -run TestInitGradleIntegration -count=1 -v
+        env:
+          KPM_GRADLE_INTEGRATION: '1'
       - name: Verify Kotlin Multiplatform consumer
         run: ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain

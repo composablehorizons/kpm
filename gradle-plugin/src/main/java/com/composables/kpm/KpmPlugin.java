@@ -116,7 +116,7 @@ public final class KpmPlugin implements Plugin<Project> {
                 throw new GradleException("package.yml version must be a semantic version, such as 0.1.0.");
             }
             name = text(values, "name");
-            description = text(values, "description");
+            description = values.containsKey("description") ? text(values, "description") : null;
             legacyPublishing = !values.containsKey("publishing") && List.of(
                 "groupId", "artifactId", "url", "licenses", "developers", "scm", "issueManagement"
             ).stream().anyMatch(values::containsKey);
@@ -127,6 +127,7 @@ public final class KpmPlugin implements Plugin<Project> {
                 scm = issues = null;
                 return;
             }
+            if (description == null) text(values, "description");
             var publication = legacyPublishing ? values : mapping(values.get("publishing"), "publishing");
             groupId = text(publication, "groupId");
             artifactId = text(publication, "artifactId");

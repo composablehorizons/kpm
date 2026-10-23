@@ -25,8 +25,8 @@ for arg do
   esac
 done
 printf '%s\n' "$@" >> calls
-if [ -f fail-install ] && [ "$1" = kpmInstall ]; then exit 7; fi
-if [ "$1" = kpmLookup ]; then
+if [ -f fail-install ] && [ "$1" = :kpmInstall ]; then exit 7; fi
+if [ "$1" = :kpmLookup ]; then
   if [ -n "$lookup" ]; then printf '%s' '{"version":"2.0.0"}' > "$report"
   else printf '%s' '{"target":"common"}' > "$report"; fi
 elif [ -f test-report ]; then

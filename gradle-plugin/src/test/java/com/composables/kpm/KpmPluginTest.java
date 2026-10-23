@@ -97,6 +97,13 @@ public class KpmPluginTest {
         assertTrue(runner(root, "help", "--configuration-cache").build().getOutput().contains("Reusing configuration cache"));
     }
 
+    @Test public void descriptionIsOptionalUntilPublishingIsConfigured() throws Exception {
+        Path root = project("name: Example\nversion: 0.1.0\n");
+        runner(root, "help").build();
+        String publishing = nestedMetadata().replace("description: Example library\n", "");
+        assertTrue(runner(project(publishing), "help").buildAndFail().getOutput().contains("description"));
+    }
+
     @Test public void rejectsMalformedOrIncompletePublishing() throws Exception {
         assertTrue(runner(project("name: Example\ndescription: Example\nversion: 1.2.3\npublishing: false\n"), "help")
             .buildAndFail().getOutput().contains("publishing must be a YAML mapping"));

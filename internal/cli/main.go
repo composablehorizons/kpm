@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -18,6 +17,7 @@ const usage = `kpm — manage dependencies, version packages, and publish to Mav
 
 Usage:
   kpm --version
+  kpm init [-y|--yes]
   kpm version [patch|minor|major|VERSION|from-git]
   kpm publish [--dry-run]
   kpm install|i [group:artifact[:version]|group:artifact@latest ...] [--target TARGET] [--api|--implementation]
@@ -32,6 +32,8 @@ Omitting a version lets Gradle supply it through a platform or dependency constr
 Use group:artifact@latest to look up and save the latest release version.
 update refreshes resolution within declared Gradle version constraints.
 --save also saves resolved exact versions for dependencies already pinned exactly.
+
+init sets up KPM in the current Gradle project; -y accepts inferred defaults.
 
 Version options (before or after the version):
   --no-git-tag-version      Update package.yml without a commit or tag
@@ -74,6 +76,9 @@ func run(dir string, args []string, out, stderr io.Writer) error {
 		_, _ = io.WriteString(out, usage)
 		return nil
 	}
+	if args[0] == "init" {
+		return initCommand(dir, args[1:], os.Stdin, out, stderr)
+	}
 	if !isDependencyCommand(args[0]) && args[0] != "version" && args[0] != "publish" {
 		return fmt.Errorf("unknown command %q; use kpm --help", args[0])
 	}
@@ -100,14 +105,7 @@ func run(dir string, args []string, out, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	wrapper := filepath.Join(root, "gradlew")
-	if runtime.GOOS == "windows" {
-		wrapper += ".bat"
-	}
-	if _, err := os.Stat(wrapper); err != nil {
-		return fmt.Errorf("Gradle wrapper: %w", err)
-	}
-	gradleArgs := []string{"publishAllPublicationsToMavenCentral", "--no-configuration-cache"}
+	gradleArgs := []string{"--no-configuration-cache"}
 	if *dryRun {
 		gradleArgs = append(gradleArgs, "--dry-run")
 	}
@@ -116,11 +114,12 @@ func run(dir string, args []string, out, stderr io.Writer) error {
 		fmt.Fprint(out, " (dry run; no upload)")
 	}
 	fmt.Fprintln(out)
-	cmd := exec.Command(wrapper, gradleArgs...)
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd.exe", append([]string{"/d", "/c", wrapper}, gradleArgs...)...)
+	cmd, cleanup, err := gradleCommand(root, "publishAllPublicationsToMavenCentral", gradleArgs)
+	if err != nil {
+		return err
 	}
-	cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr = root, os.Stdin, out, stderr
+	defer cleanup()
+	cmd.Stdout, cmd.Stderr = out, stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("Gradle publishing failed: %w", err)
 	}
@@ -130,7 +129,7 @@ func run(dir string, args []string, out, stderr io.Writer) error {
 func findPackage(dir string) (string, error) {
 	if _, err := os.Stat(filepath.Join(dir, "package.yml")); err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("no package.yml in the current directory; run KPM from your package directory")
+			return "", fmt.Errorf("no package.yml in the current directory; run kpm init to set up KPM, or run from your package directory")
 		}
 		return "", err
 	}

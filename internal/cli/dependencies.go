@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"text/tabwriter"
 
@@ -197,20 +194,13 @@ func removeDependency(d dependency) {
 }
 func gradleDependency(dir, task string, properties map[string]string, refresh bool, out, stderr io.Writer) (dependencyReport, error) {
 	var report dependencyReport
-	wrapper := filepath.Join(dir, "gradlew")
-	if runtime.GOOS == "windows" {
-		wrapper += ".bat"
-	}
-	if _, err := os.Stat(wrapper); err != nil {
-		return report, fmt.Errorf("Gradle wrapper: %w", err)
-	}
 	file, err := os.CreateTemp("", "kpm-report-*.json")
 	if err != nil {
 		return report, err
 	}
 	file.Close()
 	defer os.Remove(file.Name())
-	args := []string{task, "--console=plain", "--no-configuration-cache", "-Pkpm.report=" + file.Name()}
+	args := []string{"--console=plain", "--no-configuration-cache", "-Pkpm.report=" + file.Name()}
 	for key, value := range properties {
 		args = append(args, "-Pkpm."+key+"="+value)
 	}
@@ -224,11 +214,12 @@ func gradleDependency(dir, task string, properties map[string]string, refresh bo
 			args = append(args, "--write-locks")
 		}
 	}
-	cmd := exec.Command(wrapper, args...)
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd.exe", append([]string{"/d", "/c", wrapper}, args...)...)
+	cmd, cleanup, err := gradleCommand(dir, task, args)
+	if err != nil {
+		return report, err
 	}
-	cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr = dir, os.Stdin, stderr, stderr
+	defer cleanup()
+	cmd.Stdout, cmd.Stderr = stderr, stderr
 	if err := cmd.Run(); err != nil {
 		return report, fmt.Errorf("Gradle dependency resolution failed: %w", err)
 	}

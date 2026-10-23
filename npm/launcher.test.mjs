@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { version } from '../package.json';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,19 @@ test('launcher runs the bundled binary and forwards version arguments', () => {
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe('1.2.4');
     expect(run(['version'], directory).stdout.trim()).toBe('1.2.4');
+  } finally { rmSync(directory, { recursive: true }); }
+});
+test('launcher initializes an existing Gradle project with the matching plugin version', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'kpm-init-launcher-'));
+  try {
+    writeFileSync(join(directory, 'settings.gradle.kts'), 'rootProject.name = "hello"\n');
+    writeFileSync(join(directory, 'build.gradle.kts'), 'plugins { id("java-library") }\n');
+    writeFileSync(join(directory, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'), '');
+    const result = run(['init', '-y'], directory);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('KPM is configured');
+    expect(readFileSync(join(directory, 'package.yml'), 'utf8')).toContain('name: hello');
+    expect(readFileSync(join(directory, 'build.gradle.kts'), 'utf8')).toContain(`id("com.composables.kpm") version "${version}"`);
   } finally { rmSync(directory, { recursive: true }); }
 });
 test('launcher propagates command errors', () => {

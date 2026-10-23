@@ -261,7 +261,7 @@ func TestPublishDelegatesToGradle(t *testing.T) {
 		if _, err := invoke(dir, args...); err != nil {
 			t.Fatal(err)
 		}
-		expected := dir + "\npublishAllPublicationsToMavenCentral\n--no-configuration-cache\n"
+		expected := dir + "\n:publishAllPublicationsToMavenCentral\n--no-configuration-cache\n"
 		if dryRun {
 			expected += "--dry-run\n"
 		}
