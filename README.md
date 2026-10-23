@@ -8,6 +8,7 @@ Add dependencies to Kotlin/JVM, Android, and Kotlin Multiplatform projects from
 the terminal. KPM keeps them in `package.yml` and uses Gradle to resolve them:
 
 ```sh
+kpm init
 kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core@latest
 kpm list
 ```
@@ -32,7 +33,7 @@ kpm --version
 Requires **Node.js 18+** and npm. The package includes a native binary for each
 supported platform; using the published CLI does not require Go.
 
-Your project needs a Gradle wrapper and JDK 17+. Keep its Kotlin/Android plugins,
+Your project needs a Gradle wrapper, settings file, and JDK 17+. Keep its Kotlin/Android plugins,
 targets, and repositories configured in Gradle. Git is needed for release
 commits and tags; publishing credentials are covered in the
 [advanced publishing example](#advanced-publish-a-library).
@@ -51,63 +52,24 @@ Notifications are disabled in CI, when output is redirected, for `--version`, an
 
 ## Quick start
 
-Start in an existing Kotlin project with its Gradle wrapper in the project directory.
-
-### 1. Configure plugin repositories
-
-In `settings.gradle.kts`:
-
-```kotlin
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-```
-
-### 2. Add the Gradle plugin
-
-Add KPM alongside your existing Kotlin or Android plugin in `build.gradle.kts`:
-
-```kotlin
-plugins {
-    // Keep your existing Kotlin/Android plugin here.
-    id("com.composables.kpm") version "0.3.0"
-}
-
-repositories {
-    mavenCentral()
-    // Add google() when using AndroidX dependencies.
-}
-```
-
-### 3. Add package metadata
-
-Create `package.yml` next to `build.gradle.kts` and replace the example values:
-
-```yaml
-name: My Kotlin Project
-description: Shared Kotlin code for my app.
-version: 0.1.0
-```
-
-### 4. Add a dependency
-
-Run from the directory containing `package.yml` and the Gradle wrapper:
+Start in an existing Kotlin project or module with `build.gradle.kts` or
+`build.gradle` and a Gradle wrapper in that directory or a parent directory:
 
 ```sh
+kpm init
 kpm i org.jetbrains.kotlinx:kotlinx-coroutines-core@latest
 kpm list
 ```
 
-KPM looks up the latest release through your Gradle repositories, saves its exact
-version under `dependencies` in `package.yml`, and resolves the dependency. It
-uses `implementation` in `commonMain` for a Multiplatform project, or the main
-configuration for Kotlin/JVM and Android. Your next Gradle build or IDE sync
-uses the saved declaration.
+`kpm init` creates `package.yml`, applies the Gradle plugin, and configures
+repositories. The install command saves the exact latest release and resolves it
+through Gradle. Your next build or IDE sync uses the saved dependency.
 
-No publishing metadata or credentials are needed for dependency management.
+For a build with multiple modules, run these commands inside the module you want
+to manage, such as `app/`. KPM finds the parent wrapper automatically.
+
+Use `kpm init -y` to accept defaults. See [initialization options](#initialize-an-existing-project)
+or [manual setup](#advanced-manual-setup) for custom builds.
 
 ## Features
 
@@ -124,6 +86,35 @@ No publishing metadata or credentials are needed for dependency management.
   Actions, with a dry run to inspect the publishing task graph.
 
 ## Examples
+
+### Initialize an existing project
+
+`kpm init` asks for the package name, version, and an optional description. It
+creates `package.yml`, applies the KPM Gradle plugin, and adds missing Maven
+Central repositories. It uses settings-level dependency repositories when your
+build centralizes them there. To accept inferred defaults without questions:
+
+```sh
+kpm init -y
+```
+
+The name defaults to the Gradle root project name or module folder name. KPM
+reuses a literal semantic version from the build or `gradle.properties`, falling
+back to `0.1.0`. A simple build-file version assignment moves into `package.yml`
+so future `kpm version` changes take effect. Existing manifest values,
+dependencies, and repository configuration are preserved; rerunning initialization
+leaves configured files unchanged.
+
+No publishing metadata or credentials are needed for dependency management.
+
+Initialization supports direct `plugins` and `repositories` blocks in Kotlin and
+Groovy scripts. For computed versions or layouts it cannot safely edit, it leaves
+files unchanged and prints the manual steps. See [manual setup](#advanced-manual-setup).
+
+For Android and other builds with multiple modules, run these commands inside
+the module you want to manage, such as `app/`. KPM finds the parent wrapper and
+asks Gradle to select that module, including custom project directory mappings.
+Dependency and publishing tasks run only for the selected package.
 
 ### Manage dependencies
 
@@ -171,6 +162,7 @@ kpm update --save
 
 | Command | What it does |
 | --- | --- |
+| `kpm init` | Configures KPM in the current Gradle project; `-y` / `--yes` accepts defaults. |
 | `kpm install` / `kpm i` | Resolves and downloads declared dependencies through Gradle. |
 | `kpm i group:artifact[:version]` | Installs and saves a dependency; an omitted version is supplied by Gradle constraints. |
 | `kpm i group:artifact@latest` | Looks up the latest release through Gradle and saves its exact version. |
@@ -205,6 +197,52 @@ For all command options, run:
 
 ```sh
 kpm --help
+```
+
+## Advanced: Manual setup
+
+Use these steps for custom Gradle layouts, or when you want to configure KPM
+without `kpm init`. Keep your existing Kotlin/Android plugins and targets.
+
+### Configure plugin repositories
+
+In `settings.gradle.kts`:
+
+```kotlin
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+### Add the Gradle plugin
+
+Add KPM alongside your existing Kotlin or Android plugin in `build.gradle.kts`.
+If dependency repositories are centralized in settings, add `mavenCentral()`
+there instead of adding a project-level `repositories` block:
+
+```kotlin
+plugins {
+    // Keep your existing Kotlin/Android plugin here.
+    id("com.composables.kpm") version "0.3.0"
+}
+
+repositories {
+    mavenCentral()
+    // Add google() when using AndroidX dependencies.
+}
+```
+
+### Add package metadata
+
+Create `package.yml` next to `build.gradle.kts` and replace the example values:
+
+```yaml
+name: My Kotlin Project
+description: Shared Kotlin code for my app.
+version: 0.1.0
 ```
 
 ## Advanced: Publish a library
@@ -387,7 +425,7 @@ publishing:
 | Field | Required | Purpose |
 | --- | --- | --- |
 | `name` | Yes | Display name of the library. |
-| `description` | Yes | Summary of what the library does. |
+| `description` | For publishing | Summary of what the library does; optional for dependency management. |
 | `publishing.groupId` | Yes | Maven namespace, such as `com.example`. Also sets the Gradle project group. |
 | `publishing.artifactId` | Yes | Maven artifact name, such as `my-library`. |
 | `version` | Yes | Package version in semantic version format, such as `1.2.3` or `1.2.3-SNAPSHOT`. Also sets the Gradle project version. |
@@ -409,7 +447,7 @@ publishing:
 | `publishing.issueManagement.system` | When `publishing.issueManagement` is present | Tracker name, such as `GitHub Issues`. |
 | `publishing.issueManagement.url` | When `publishing.issueManagement` is present | URL of the issue tracker. |
 
-The `publishing` block is optional. When omitted, KPM sets the package version without configuring Maven publishing. The fields marked required inside `publishing` are required only when publishing is configured. `name`, `description`, and `version` remain at the top level.
+The `publishing` block is optional. When omitted, KPM sets the package version without configuring Maven publishing. The fields marked required inside `publishing` are required only when publishing is configured. `name` and `version` are always required. `description` is required for publishing; it is optional for dependency management. These fields remain at the top level.
 
 Existing top-level publishing fields remain supported until 1.0.0 and produce a deprecation warning. Move them under `publishing` to migrate. If both formats are present, the nested block takes precedence as a whole; KPM does not merge the formats.
 
@@ -445,15 +483,16 @@ Versions are illustrative. Each target can use a list (implementation) or a mapp
 
 ### File location
 
-Run the CLI from the directory containing `package.yml`. It reads only that directory and reports an error if the file is missing. The Gradle plugin reads it from the project where the plugin is applied. For dependency commands and publishing, that directory must also contain the Gradle wrapper.
+Run the CLI from the directory containing `package.yml`. It reads only that directory and reports an error if the file is missing. The Gradle plugin reads it from the project where the plugin is applied. For dependency commands and publishing, KPM searches that directory and its parents for the Gradle wrapper. It uses Gradle's project directory mapping to run tasks only for the current package; it does not read a parent package's manifest.
 
 Apply KPM to each package project whose dependencies or publishing it should configure. Dependencies can also be declared directly in Gradle; Gradle handles conflicts and transitive resolution.
 
 ## Limitations and troubleshooting
 
+- **Initialization needs manual setup?** Use the printed edits or the [manual setup](#advanced-manual-setup) steps. Computed versions and scripts without a direct `plugins` block require manual configuration. Initialization does not migrate existing Gradle dependencies or generate a new Kotlin project.
 - **Dependency resolution fails?** Check your Gradle repositories, credentials, target declarations, and requested versions. Upgrade the Gradle plugin alongside the CLI to use dependency commands.
 - **No `package.yml` found?** Run from the directory containing it. The CLI does
-  not search parent directories. Keep the Gradle wrapper there for publishing.
+  not search parent directories for manifests. Run `kpm init` to configure a new package. The wrapper can live in a parent directory.
 - **Working tree is dirty?** Commit or stash changes before creating a version
   commit/tag, or use `--no-git-tag-version` to update metadata only.
 - **Tag already exists?** Choose a new version or check the tag prefix. KPM
