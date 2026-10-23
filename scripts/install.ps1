@@ -46,9 +46,18 @@ try {
     $entries = @(Get-Content $checksums | Where-Object { $_ -cmatch $pattern })
     if ($entries.Count -ne 1) { throw "Missing or invalid checksum for $asset" }
     $expected = [regex]::Match($entries[0], $pattern).Groups[1].Value
-    $actual = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    # Use .NET directly so installation does not depend on optional PS modules.
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($archive)
+    try {
+        $actual = [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $stream.Dispose()
+        $sha256.Dispose()
+    }
     if ($actual -cne $expected) { throw 'Checksum mismatch. Existing installation was not changed.' }
-    Expand-Archive -Path $archive -DestinationPath $temporary
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($archive, $temporary)
     $binary = Join-Path $temporary 'kpm.exe'
     $installedVersion = & $binary --version
     if ($LASTEXITCODE -ne 0 -or $installedVersion -cne $Version) { throw 'Downloaded binary version does not match the release.' }
