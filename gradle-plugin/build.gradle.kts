@@ -4,10 +4,7 @@ plugins {
 }
 
 group = "com.composables"
-val packageMetadata = groovy.json.JsonSlurper().parseText(
-    providers.fileContents(rootProject.layout.projectDirectory.file("package.json")).asText.get()
-) as Map<*, *>
-version = requireNotNull(packageMetadata["version"]) { "package.json must define version" }.toString()
+version = providers.fileContents(rootProject.layout.projectDirectory.file("VERSION")).asText.get().trim()
 repositories { mavenCentral(); gradlePluginPortal() }
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
 gradlePlugin {

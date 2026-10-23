@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Distribute native CLI archives and SHA-256 checksums through GitHub Releases. Install using `scripts/install.sh` on macOS/Linux or `scripts/install.ps1` on Windows; rerun the installer to update.
+- Remove the npm package, Node launcher, npm update notifier, and Bun build tooling. Build release archives with Go and use `VERSION` as the shared CLI/Gradle plugin release version.
+
 ## [0.4.0] - 2026-10-23
 
 ### Added

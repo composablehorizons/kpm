@@ -17,19 +17,26 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '22'
       - run: go test ./...
-      - run: bun run build
-      - run: bun test npm
-      - name: Verify npm installation
+      - run: go run ./scripts/build.go
+      - name: Verify native installation
         shell: bash
         run: |
-          archive="$(npm pack --ignore-scripts --silent)"
-          npm install --prefix build/npm-check --ignore-scripts --no-audit --no-fund "./$archive"
-          node build/npm-check/node_modules/@composablehorizons/kpm/bin/kpm.cjs --version
+          version=$(tr -d '\r\n' < VERSION)
+          case "$RUNNER_OS/$RUNNER_ARCH" in
+            Linux/X64) asset="kpm_${version}_linux_amd64.tar.gz" ;;
+            macOS/ARM64) asset="kpm_${version}_darwin_arm64.tar.gz" ;;
+            macOS/X64) asset="kpm_${version}_darwin_amd64.tar.gz" ;;
+            Windows/X64) asset="kpm_${version}_windows_amd64.zip" ;;
+            Windows/ARM64) asset="kpm_${version}_windows_arm64.zip" ;;
+            *) echo 'Unsupported runner'; exit 1 ;;
+          esac
+          mkdir -p build/native-check
+          case "$asset" in
+            *.zip) unzip "dist/$asset" -d build/native-check; binary=build/native-check/kpm.exe ;;
+            *) tar -xzf "dist/$asset" -C build/native-check; binary=build/native-check/kpm ;;
+          esac
+          test "$("$binary" --version)" = "$version"
   gradle:
     runs-on: ubuntu-latest
     steps:

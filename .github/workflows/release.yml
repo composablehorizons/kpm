@@ -5,13 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag, e.g. v0.2.1
+        description: Existing release tag, e.g. v0.5.0
         required: true
         type: string
-      publish_npm:
-        description: Publish the npm CLI (skip if this version already exists)
-        type: boolean
-        default: true
       publish_maven:
         description: Publish Maven artifacts (disable when retrying an accepted upload)
         type: boolean
@@ -28,8 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      dist_tag: ${{ steps.version.outputs.dist_tag }}
-      archive: ${{ steps.pack.outputs.archive }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -37,102 +32,49 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Verify release tag and requested registries
+      - name: Verify release tag
         id: version
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PUBLISH_NPM: ${{ inputs.publish_npm }}
-          PUBLISH_MAVEN: ${{ inputs.publish_maven }}
         run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          if (process.env.RELEASE_TAG !== `v${version}`) throw new Error('Release tag must match package.json version');
-          if (process.env.EVENT_NAME === 'workflow_dispatch' && process.env.PUBLISH_NPM !== 'true' && process.env.PUBLISH_MAVEN !== 'true') {
-            throw new Error('Select at least one registry to publish');
-          }
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\ndist_tag=${version.includes('-') ? 'next' : 'latest'}\n`);
-          JS
+          version=$(tr -d '\r\n' < VERSION)
+          test "$RELEASE_TAG" = "v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "${version%%+*}" in
+            *-*) echo 'prerelease=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'prerelease=false' >> "$GITHUB_OUTPUT" ;;
+          esac
       - run: go test ./...
-      - run: bun run build
-      - run: bun test npm
+      - run: go run ./scripts/build.go
+      - name: Verify the packaged native CLI
+        run: |
+          version=$(tr -d '\r\n' < VERSION)
+          mkdir -p build/native-release-check
+          tar -xzf "dist/kpm_${version}_linux_amd64.tar.gz" -C build/native-release-check
+          test "$(build/native-release-check/kpm --version)" = "$version"
+          cd dist
+          sha256sum --check SHA256SUMS
       - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - name: Verify initialization and module commands
+        run: go test ./internal/cli -run TestInitGradleIntegration -count=1
+        env:
+          KPM_GRADLE_INTEGRATION: '1'
       - name: Verify Kotlin Multiplatform consumer
         run: ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
-      - name: Pack and verify the npm artifact
-        id: pack
-        env:
-          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          archive="$(npm pack --ignore-scripts --silent)"
-          npm install --prefix build/npm-release-check --ignore-scripts --no-audit --no-fund "./$archive"
-          actual="$(node build/npm-release-check/node_modules/@composablehorizons/kpm/bin/kpm.cjs --version)"
-          test "$actual" = "$EXPECTED_VERSION"
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: npm-package
-          path: ${{ steps.pack.outputs.archive }}
+          name: native-release
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/install.sh
+            dist/install.ps1
           if-no-files-found: error
           retention-days: 7
-
-  npm:
-    needs: verify
-    if: github.event_name == 'push' || inputs.publish_npm
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-      - name: Install npm with trusted publishing support
-        run: npm install --global npm@12.2.1
-      - uses: actions/download-artifact@v4
-        with:
-          name: npm-package
-          path: build/npm-release
-      - name: Check whether this npm version is already published
-        id: registry
-        env:
-          # npm retries registry reads; a one-shot fetch bypasses that recovery.
-          NPM_CONFIG_FETCH_RETRIES: '2'
-          NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: '10000'
-          NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: '60000'
-          NPM_CONFIG_FETCH_TIMEOUT: '60000'
-        run: |
-          package_spec="$(node -p 'const p = require("./package.json"); p.name + "@" + p.version')"
-          if output=$(npm view "$package_spec" version --prefer-online 2>&1); then
-            echo 'exists=true' >> "$GITHUB_OUTPUT"
-          elif grep -Eq '^npm (ERR!|error) code E404$' <<< "$output"; then
-            echo 'exists=false' >> "$GITHUB_OUTPUT"
-          else
-            echo '::error::Could not determine npm publication state after npm registry retries.'
-            printf '%s\n' "$output" >&2
-            exit 1
-          fi
-      - name: Publish the verified archive using npm trusted publishing
-        if: steps.registry.outputs.exists != 'true'
-        env:
-          ARCHIVE: ${{ needs.verify.outputs.archive }}
-          DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
-        run: npm publish "build/npm-release/$ARCHIVE" --access public --tag "$DIST_TAG" --ignore-scripts
-      - name: Report existing npm publication
-        if: steps.registry.outputs.exists == 'true'
-        run: echo 'This npm version is already published; leaving the immutable release unchanged.'
 
   maven:
     needs: verify
@@ -157,10 +99,9 @@ jobs:
         run: ./gradlew :gradle-plugin:publishAllPublicationsToMavenCentral --no-configuration-cache --console=plain
 
   github-release:
-    needs: [verify, npm, maven]
+    needs: [verify, maven]
     if: >-
       always() && needs.verify.result == 'success' &&
-      (needs.npm.result == 'success' || needs.npm.result == 'skipped') &&
       (needs.maven.result == 'success' || needs.maven.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
@@ -170,15 +111,45 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-release
+          path: build/native-release
       - name: Create the draft GitHub release if missing
         env:
           GH_TOKEN: ${{ github.token }}
-          DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'GitHub release already exists.'
+            echo 'GitHub release already exists; preserving its publication state.'
           else
             flags=()
-            if [ "$DIST_TAG" = next ]; then flags+=(--prerelease); fi
+            if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
             gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --draft --generate-notes "${flags[@]}"
           fi
+      - name: Upload native assets without replacing existing files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/native-release
+          sha256sum --check SHA256SUMS
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/kpm-existing-assets"
+          # Compare every existing file before making any changes. A rerun
+          # must never mix newly rebuilt assets with an older checksum manifest.
+          mkdir -p "$RUNNER_TEMP/kpm-existing-downloads"
+          for asset in *; do
+            if grep -Fxq "$asset" "$RUNNER_TEMP/kpm-existing-assets"; then
+              gh release download "$RELEASE_TAG" --pattern "$asset" --dir "$RUNNER_TEMP/kpm-existing-downloads"
+              if ! cmp -s "$asset" "$RUNNER_TEMP/kpm-existing-downloads/$asset"; then
+                echo "::error::Existing asset differs: $asset. Recover the original verified artifact instead of overwriting it."
+                exit 1
+              fi
+            fi
+          done
+          for asset in *; do
+            if grep -Fxq "$asset" "$RUNNER_TEMP/kpm-existing-assets"; then
+              echo "Keeping existing asset: $asset"
+            else
+              gh release upload "$RELEASE_TAG" "$asset"
+            fi
+          done

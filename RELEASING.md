@@ -1,8 +1,10 @@
 # Releasing KPM
 
-All production publishing runs in [the Release workflow](.github/workflows/release.yml): the npm CLI, the Maven plugin and marker, and a draft GitHub release. Local work prepares the version commit and `v<version>` tag; pushing that tag starts the workflow. Do not run `npm publish` or the Gradle production publishing task locally.
-
-The workflow checks out the immutable tag, verifies it matches `package.json`, builds all six native binaries, runs CLI and Gradle checks, and verifies installation of the packed npm archive. It publishes that exact archive with npm trusted publishing and uploads the Maven publications using the existing signing/Central secrets. A draft GitHub release with generated notes is created after successful publication jobs. A maintainer reviews and publishes the draft separately. Prerelease npm versions use the `next` dist-tag; stable versions use `latest`.
+Production publishing runs in [the Release workflow](.github/workflows/release.yml).
+It builds native CLI archives, publishes the Gradle plugin and marker to Maven
+Central, and creates a draft GitHub release with the binaries, installers, and
+`SHA256SUMS` attached. Publish the draft after reviewing it to make those assets
+available to the installers. CLI distribution uses GitHub Releases.
 
 ## Release steps
 
@@ -10,33 +12,37 @@ The workflow checks out the immutable tag, verifies it matches `package.json`, b
    the next semantic version. Use a patch for fixes, a minor for new features,
    and a major for breaking changes; before 1.0, use a minor for breaking changes.
 
-2. Update `package.json` without creating the commit or tag yet. For example:
+2. Update the root `VERSION` file. For example:
 
    ```sh
-   release_version=0.4.0
-   npm version "$release_version" --no-git-tag-version --ignore-scripts
+   release_version=0.5.0
+   printf '%s\n' "$release_version" > VERSION
    ```
 
-   The Gradle plugin and native CLI builds read their release version from
-   `package.json`. Also update the development fallback plugin version in
-   `internal/cli/init.go`, its expected version in `internal/cli/init_test.go`,
-   and current-version examples in the README.
+   Both the Go archive builder and the Gradle plugin read this file. Also update
+   the development fallback plugin version in `internal/cli/init.go`, its expected
+   version in `internal/cli/init_test.go`, and current-version README examples.
 
 3. Update `CHANGELOG.md`. Collect all user-visible changes under `[Unreleased]`,
    including new features, fixes, and breaking changes. Move those entries into
    a `## [<version>] - YYYY-MM-DD` section for this release, and leave an empty
-   `[Unreleased]` section above it for future changes. Review the entries against
-   the commits since the previous release tag.
+   `[Unreleased]` section above it. Review the entries against the commits since
+   the previous release tag.
 
 4. Build and verify the release:
 
    ```sh
-   bun run build
-   bun run test
+   go run ./scripts/build.go
+   go test ./...
    ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
    KPM_GRADLE_INTEGRATION=1 go test ./internal/cli -run TestInitGradleIntegration -count=1
    ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
    ```
+
+   `dist/` contains six archives: `.tar.gz` for macOS/Linux and `.zip` for
+   Windows, each for x64 and ARM64. It also contains the installers and a
+   `SHA256SUMS` manifest. The build injects the version into each executable.
+   CI tests the shell installer on macOS/Linux and PowerShell on Windows.
 
 5. Review the diff, commit the release files, and push the commit. Wait for its
    Verify workflow to pass before tagging:
@@ -44,56 +50,80 @@ The workflow checks out the immutable tag, verifies it matches `package.json`, b
    ```sh
    git diff --check
    git diff
-   git add package.json CHANGELOG.md README.md internal/cli/init.go internal/cli/init_test.go
+   git add VERSION CHANGELOG.md README.md internal/cli/init.go internal/cli/init_test.go
    git commit -m "Release $release_version"
    git push origin main
    ```
 
 6. Create an annotated tag at the verified release commit and push it to start
-   the Release workflow. The tag must match `package.json` exactly:
+   the Release workflow. The tag must match `VERSION` exactly:
 
    ```sh
    git tag -a "v$release_version" -m "Release $release_version"
    git push origin "v$release_version"
    ```
 
-7. Wait for the Release workflow to finish. Confirm the npm version is available
-   and the Maven upload succeeded. Maven Central may still be processing an
-   accepted upload before the artifacts become downloadable:
+7. Wait for the workflow to finish. It checks the tagged source, verifies all
+   archive checksums, and uploads those exact assets to a draft GitHub release.
+   Confirm the Maven upload succeeded; Central may still be processing an
+   accepted upload before artifacts become downloadable.
 
-   ```sh
-   npm view "@composablehorizons/kpm@$release_version" version
-   ```
-
-8. Open the **draft** on the repository's GitHub Releases page. Review and edit
-   the generated release notes against `CHANGELOG.md`, check the version and
-   prerelease status, then click **Publish release** to make it public. After
-   reviewing, you can also publish it from the terminal:
+8. Open the **draft** on GitHub Releases. Review and edit the generated notes
+   against `CHANGELOG.md`, check the version, prerelease status, and all nine
+   assets (six archives, two installers, and `SHA256SUMS`). Click **Publish release**
+   to make the release and its downloads public. After reviewing, you can also:
 
    ```sh
    gh release edit "v$release_version" --draft=false
    ```
 
-   The draft only holds back the GitHub release announcement. npm publication
-   and the Maven upload have already happened by this point.
+   Stable releases are selected by the installer's latest-release URL. Prereleases
+   must be installed by explicitly selecting their version. The draft holds back
+   the CLI downloads; the Maven upload has already happened at this point.
 
-## One-time publishing setup
+9. Verify the public installation:
 
-One-time npm setup: authorize GitHub repository `composablehorizons/kpm`, workflow filename `release.yml`, to publish `@composablehorizons/kpm`. Use [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) with direct `npm publish` allowed; the workflow has `id-token: write` and needs no `NPM_TOKEN` secret. A maintainer can configure this in npm package settings or with:
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION="$release_version" sh
+   "$HOME/.local/bin/kpm" --version
+   ```
 
-```sh
-npm trust github @composablehorizons/kpm --repo composablehorizons/kpm --file release.yml --allow-publish --yes
-```
+   Verify the Windows installer in PowerShell as well. Re-running an installer
+   updates or replaces the installed CLI after verifying its download.
 
-This configuration step may require a one-time security-key approval. Subsequent GitHub releases authenticate through OIDC without local npm login or per-release authentication prompts.
+## Publishing credentials
+
+The release workflow uses its GitHub token with `contents: write` to upload release
+assets. Maven publishing uses the existing `OSSRH_USERNAME`, `OSSRH_PASSWORD`,
+`SIGNING_KEY`, `SIGNING_KEY_ID`, and `SIGNING_PASSWORD` repository secrets. Production
+Maven uploads run in CI through the project's Gradle wrapper.
 
 ## Recover a partial release
 
-For recovery, dispatch the current workflow from `main` and select the existing release tag. Its `publish_npm` and `publish_maven` inputs let you retry one registry without repeating the other upload. The npm publication check uses `npm view` with two retries for temporary network/server failures and a 60-second request timeout. Only an explicit npm `E404` means the version is missing; other failures stop publication. Existing npm versions and GitHub releases are skipped. Maven Central processes accepted uploads asynchronously; disable `publish_maven` if that version was already accepted, even when it is not yet downloadable. Do not move a published tag.
-
-For example, finish only the npm publication of `v0.2.1`:
+Dispatch the current workflow from `main` with the existing release tag. Set
+`publish_maven=false` if Central already accepted that version, even when it is
+not yet downloadable:
 
 ```sh
 gh workflow run release.yml --ref main \
-  -f tag=v0.2.1 -f publish_npm=true -f publish_maven=false
+  -f tag=v0.5.0 -f publish_maven=false
 ```
+
+The workflow keeps the publication state of an existing GitHub release and uploads
+missing assets without replacing existing files. Existing files must match the
+verified artifact; investigate differences rather than overwriting released
+binaries. Do not move an existing release tag or repeat an accepted Maven upload.
+
+Releases before this distribution migration do not contain `VERSION` or the Go
+archive builder. To add native downloads to an older release without changing its
+CLI version, recover the original binaries from that release's successful Actions
+build, then package them using the current builder:
+
+```sh
+go run ./scripts/build.go --binaries-dir /path/to/original/dist --output /path/to/assets
+```
+
+The current `VERSION` must match those original binaries. Verify the native
+executable version and checksums before attaching the resulting assets to the
+existing mutable release. This packages the original executable bytes without
+rebuilding or retagging that version.

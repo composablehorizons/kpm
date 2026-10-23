@@ -23,32 +23,65 @@ Available on macOS, Linux, and Windows, with bundled x64 and ARM64 binaries.
 
 ## Installation
 
-Install the CLI from npm:
+### macOS and Linux
+
+Install the latest published release:
 
 ```sh
-npm install --global @composablehorizons/kpm
+curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh
+```
+
+The installer detects Intel/x64 or ARM64, verifies the archive's SHA-256 checksum,
+and installs `kpm` into `~/.local/bin`. If that directory is not on your PATH:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
 kpm --version
 ```
 
-Requires **Node.js 18+** and npm. The package includes a native binary for each
-supported platform; using the published CLI does not require Go.
+Add the export to your shell configuration to keep it for new terminals.
+Installation requires `curl`, `tar`, and either `sha256sum` or `shasum`.
 
-Your project needs a Gradle wrapper, settings file, and JDK 17+. Keep its Kotlin/Android plugins,
-targets, and repositories configured in Gradle. Git is needed for release
-commits and tags; publishing credentials are covered in the
-[advanced publishing example](#advanced-publish-a-library).
+To install a specific release or choose a directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.4.0 --bin-dir "$HOME/.local/bin"
+```
+
+### Windows
+
+Run in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.ps1 | iex
+```
+
+The installer selects Windows x64 or ARM64, verifies the checksum, and installs
+`kpm.exe` into `%LOCALAPPDATA%\Programs\kpm\bin`. It adds that directory to your
+user PATH. Open a new terminal and run `kpm --version`. To pin a release, set
+`$env:KPM_VERSION = '0.4.0'` before running the installer. `KPM_INSTALL_DIR` overrides
+the installation directory on either platform.
+
+You can also download an archive and `SHA256SUMS` from
+[GitHub Releases](https://github.com/composablehorizons/kpm/releases/latest),
+verify the checksum, and extract the executable into a directory on your PATH.
+WSL uses the Linux installer and installs inside WSL.
+
+KPM runs as a native executable. Your Kotlin project needs a Gradle wrapper,
+settings file, and JDK 17+. Keep Kotlin/Android plugins, targets, and repositories
+in Gradle. Git is needed for release commits and tags; publishing credentials are
+covered in the [advanced publishing example](#advanced-publish-a-library).
 
 ### Updating KPM
 
-Update the CLI with:
+Rerun the installer to replace KPM with the latest published stable version.
+Use `--version` on the shell installer or `KPM_VERSION` on either installer to
+select a specific release. The installer verifies the download before replacing
+an existing installation. If you previously installed KPM through another
+package manager, remove that installation or put the new directory first on PATH.
 
-```sh
-npm install -g @composablehorizons/kpm@latest
-```
-
-In an interactive terminal, the npm launcher checks for a newer stable CLI version at most once every 24 hours. The check runs in a detached background process with a two-second network deadline. Commands never wait for the response; a later invocation displays the cached update notice on stderr, at most once per day per discovered version. Offline, registry, and cache errors are silently ignored and never change the command's result.
-
-Notifications are disabled in CI, when output is redirected, for `--version`, and when `KPM_NO_UPDATE_NOTIFIER=1` or `NO_UPDATE_NOTIFIER=1` is set. `kpm update` updates project dependencies; updating the Gradle plugin version remains a separate change to your build file.
+`kpm update` updates project dependencies; updating the KPM executable and Gradle
+plugin are separate operations.
 
 ## Quick start
 
@@ -357,12 +390,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '22'
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
-        run: npm install --global @composablehorizons/kpm@0.4.0
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.4.0 sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"
       - run: ./gradlew check
@@ -507,15 +539,15 @@ Apply KPM to each package project whose dependencies or publishing it should con
 
 ## Development and contributing
 
-Building the CLI requires Go 1.22+; the npm package build and launcher tests use
-Bun. Gradle plugin development also requires JDK 17+.
+Building the CLI and release archives requires Go 1.22+. Gradle plugin development
+also requires JDK 17+. `VERSION` is the release version used by both builds.
 
 ```sh
 # Build the native CLI for all supported platforms
-bun run build
+go run ./scripts/build.go
 
-# Test the Go CLI and npm launcher
-bun run test
+# Test the CLI and native installers
+go test ./...
 
 # Test and validate the Gradle plugin
 ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
