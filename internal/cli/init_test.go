@@ -51,7 +51,7 @@ func TestInitSetsUpKotlinAndGroovyAndIsRepeatable(t *testing.T) {
 		build := readFile(t, dir, "build"+suffix)
 		settings := readFile(t, dir, "settings"+suffix)
 		manifest := readFile(t, dir, "package.yml")
-		if !strings.Contains(build, `id("com.composables.kpm") version "0.3.0"`) || !strings.Contains(build, "example:existing:1.0") || !strings.Contains(build, "retain this note") {
+		if !strings.Contains(build, `id("com.composables.kpm") version "0.4.0"`) || !strings.Contains(build, "example:existing:1.0") || !strings.Contains(build, "retain this note") {
 			t.Fatalf("incorrect build:\n%s", build)
 		}
 		if strings.Contains(build, `version = "1.2.3"`) {

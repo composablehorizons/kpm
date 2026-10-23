@@ -362,7 +362,7 @@ jobs:
           node-version: '22'
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
-        run: npm install --global @composablehorizons/kpm@0.3.0
+        run: npm install --global @composablehorizons/kpm@0.4.0
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"
       - run: ./gradlew check

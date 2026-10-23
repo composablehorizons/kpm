@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-23
+
+### Added
+
+- `kpm init` configures KPM in an existing Gradle project: creates `package.yml`, applies the Gradle plugin, and adds missing repositories. Use `-y` / `--yes` to accept inferred defaults. Existing manifest values and dependencies are preserved; unsupported layouts receive manual setup instructions without partial edits.
+- Dependency and publishing commands find a parent Gradle wrapper and run only for the current package, including modules with custom Gradle project directory mappings.
+
+### Changed
+
+- Descriptions are optional for dependency management and remain required for publishing.
+- The README quick start uses `kpm init`; maintainer release instructions now live in `RELEASING.md`.
+- The release workflow creates a draft GitHub release for maintainer review and later publication, after publishing to npm and uploading to Maven Central.
+
 ### Fixed
 
 - Use npm’s registry retries when checking publication state instead of a single 15-second request. Treat only an explicit `E404` as an unpublished version, so releases can safely resume after temporary registry failures.
