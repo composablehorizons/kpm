@@ -1,5 +1,4 @@
 plugins {
-    kotlin("multiplatform") version "2.4.0"
     id("com.composables.kpm")
 }
 repositories { mavenCentral() }

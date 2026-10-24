@@ -43,6 +43,23 @@ fi
 
 const dependencyManifest = "# Package comment\nname: Example\nversion: 1.2.3\npublishing:\n  groupId: example\n  artifactId: example\n"
 
+func TestPackageCommandsPreservePluginDeclarations(t *testing.T) {
+	plugins := "plugins:\n  kotlin-jvm: org.jetbrains.kotlin.jvm:2.4.0 # Kotlin plugin\n  theme: com.example.theme\n"
+	dir := dependencyProject(t, dependencyManifest+plugins)
+	for _, args := range [][]string{
+		{"i", "example:tool:1.0.0"},
+		{"uninstall", "example:tool"},
+		{"version", "patch", "--no-git-tag-version"},
+	} {
+		if output, err := invoke(dir, args...); err != nil {
+			t.Fatalf("%v: %v\n%s", args, err, output)
+		}
+		if content := readFile(t, dir, "package.yml"); !strings.Contains(content, plugins) {
+			t.Fatalf("%v changed plugin declarations:\n%s", args, content)
+		}
+	}
+}
+
 func TestInstallShorthandExpansionAndScopeChanges(t *testing.T) {
 	dir := dependencyProject(t, dependencyManifest)
 	for _, args := range [][]string{
@@ -226,7 +243,7 @@ func TestRejectsMalformedDependencyDeclarations(t *testing.T) {
 }
 
 func TestUpdateSavePreservesSelectorsAndSavesExactResolvedVersions(t *testing.T) {
-	for _, version := range []string{"", "1.0.0", "1.+", "[1.0,2.0)"} {
+	for _, version := range []string{"", "1.0.0", "1.+", "[1.0,2.0)", "${versions.tool}"} {
 		t.Run(version, func(t *testing.T) {
 			notation := "example:tool"
 			if version != "" {

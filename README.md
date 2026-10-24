@@ -45,7 +45,7 @@ Installation requires `curl`, `tar`, and either `sha256sum` or `shasum`.
 To install a specific release or choose a directory:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.4.0 --bin-dir "$HOME/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.5.0 --bin-dir "$HOME/.local/bin"
 ```
 
 ### Windows
@@ -59,7 +59,7 @@ irm https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/instal
 The installer selects Windows x64 or ARM64, verifies the checksum, and installs
 `kpm.exe` into `%LOCALAPPDATA%\Programs\kpm\bin`. It adds that directory to your
 user PATH. Open a new terminal and run `kpm --version`. To pin a release, set
-`$env:KPM_VERSION = '0.4.0'` before running the installer. `KPM_INSTALL_DIR` overrides
+`$env:KPM_VERSION = '0.5.0'` before running the installer. `KPM_INSTALL_DIR` overrides
 the installation directory on either platform.
 
 You can also download an archive and `SHA256SUMS` from
@@ -68,8 +68,8 @@ verify the checksum, and extract the executable into a directory on your PATH.
 WSL uses the Linux installer and installs inside WSL.
 
 KPM runs as a native executable. Your Kotlin project needs a Gradle wrapper,
-settings file, and JDK 17+. Keep Kotlin/Android plugins, targets, and repositories
-in Gradle. Git is needed for release commits and tags; publishing credentials are
+settings file, and JDK 17+. Keep targets and repositories in Gradle; plugin
+IDs and versions can live in `package.yml`. Git is needed for release commits and tags; publishing credentials are
 covered in the [advanced publishing example](#advanced-publish-a-library).
 
 ### Updating KPM
@@ -107,7 +107,7 @@ or [manual setup](#advanced-manual-setup) for custom builds.
 ## Features
 
 - **One manifest:** `package.yml` holds dependencies and the package version,
-  with optional publishing metadata for libraries.
+  plugin declarations, and optional publishing metadata for libraries.
 - **Dependency management:** install, uninstall, list, check outdated versions, and update dependencies through Gradle using your project repositories and credentials.
 - **Semantic versioning:** choose `patch`, `minor`, `major`, an exact version, or
   a version from a Git tag.
@@ -122,7 +122,7 @@ or [manual setup](#advanced-manual-setup) for custom builds.
 
 ### Initialize an existing project
 
-`kpm init` asks for the package name, version, and an optional description. It
+`kpm init` asks for a version and optional package name and description. It
 creates `package.yml`, applies the KPM Gradle plugin, and adds missing Maven
 Central repositories. It uses settings-level dependency repositories when your
 build centralizes them there. To accept inferred defaults without questions:
@@ -131,7 +131,8 @@ build centralizes them there. To accept inferred defaults without questions:
 kpm init -y
 ```
 
-The name defaults to the Gradle root project name or module folder name. KPM
+When `name` is omitted, KPM uses the Gradle project name, including in published
+POM metadata. Initialization leaves the field out unless you enter a name. KPM
 reuses a literal semantic version from the build or `gradle.properties`, falling
 back to `0.1.0`. A simple build-file version assignment moves into `package.yml`
 so future `kpm version` changes take effect. Existing manifest values,
@@ -190,6 +191,109 @@ kpm update --save
 ```
 
 `--save` also writes resolved versions back to exact declarations; dynamic selectors remain intact. Version selectors use Gradle syntax, such as `1.+` or `[1.0,2.0)`, rather than npm's `^` and `~` syntax. Install/uninstall write enabled Gradle dependency locks; update refreshes all enabled locks or uses `--update-locks` for named packages. KPM uses Gradle's dependency cache and lockfiles, without creating a separate package lockfile. Dependency CLI tasks disable the Gradle configuration cache; normal builds still support it.
+
+### Manage Gradle plugins
+
+Starting with 0.5.0, declare project plugins in `package.yml`:
+
+```yaml
+plugins:
+  kotlin-jvm: org.jetbrains.kotlin.jvm:2.4.0
+  compose-compiler: org.jetbrains.kotlin.plugin.compose:2.4.0
+  compose: org.jetbrains.compose:1.12.0
+```
+
+Apply the settings integration in `settings.gradle.kts` so these declarations
+are available before Gradle compiles project scripts:
+
+```kotlin
+plugins {
+    id("com.composables.kpm.settings") version "0.5.0"
+}
+```
+
+The only project plugin needed in `build.gradle.kts` is KPM:
+
+```kotlin
+plugins {
+    id("com.composables.kpm")
+}
+```
+
+The project KPM plugin needs no version here because the settings integration
+already supplies it. Keep both integrations on the same KPM version.
+For local plugin development, run `./gradlew publishToMavenLocal`
+and add a filtered `mavenLocal()` to `pluginManagement.repositories`.
+
+Each label maps to a `plugin.id:version` string, or just a plugin ID for built-in
+plugins, local convention plugins, or plugins already on the build classpath.
+Omitting the version delegates resolution to Gradle; it does not select the latest release.
+KPM resolves versioned plugins through `pluginManagement.repositories`, then applies
+all declared plugins in manifest order. There is no `apply` option in the manifest.
+Kotlin DSL typed accessors such as `kotlin {}`, `java {}`, and plugin-specific blocks
+remain available. The same KPM bootstrap works in Groovy scripts.
+
+The settings integration reads manifests from the root project and included
+subprojects, respecting custom `projectDir` mappings. Plugins and dependencies belong
+only to the project containing that manifest. Labels are local to each package.
+Gradle's normal classpath constraints still apply when projects share plugin implementations.
+
+Keep settings plugins in Gradle. Existing Gradle plugin declarations continue to
+work, and dependency commands preserve the `plugins` mapping.
+Add and edit plugin declarations directly in the manifest; dependency
+CLI commands operate on Maven dependencies only.
+
+### Share versions with build tooling
+
+Define named versions and reference them in plugin or dependency coordinates:
+
+```yaml
+versions:
+  kotlin: 2.4.0
+plugins:
+  kotlin-jvm: org.jetbrains.kotlin.jvm:${versions.kotlin}
+  compose-compiler: org.jetbrains.kotlin.plugin.compose:${versions.kotlin}
+```
+
+`buildSrc` is a separate Gradle build. Give it its own `package.yml`, apply the KPM
+settings integration there, and use only `id("com.composables.kpm")` in its project
+`plugins` block. Its manifest can reference the app's named Kotlin version:
+
+```yaml
+version: 0.1.0
+versions:
+  kotlin: {from: ../package.yml}
+plugins:
+  gradle-plugin: java-gradle-plugin
+dependencies:
+  - org.jetbrains.kotlin:kotlin-gradle-plugin:${versions.kotlin}
+```
+
+`from` resolves relative to the declaring manifest and imports only the version
+with that name. It does not inherit plugins or dependencies. Missing sources,
+missing names, and circular references fail with an error. Gradle tracks referenced
+files for configuration-cache invalidation. `update --save` preserves version references.
+
+When `buildSrc` inherits KPM from its parent, requesting its version again can
+conflict with that existing classpath. This settings bootstrap also works when
+building `buildSrc` on its own:
+
+```kotlin
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "com.composables.kpm.settings") {
+                useModule("com.composables:kpm-settings:0.5.0")
+            }
+        }
+    }
+}
+plugins { id("com.composables.kpm.settings") }
+```
 
 ## Command reference
 
@@ -259,7 +363,7 @@ there instead of adding a project-level `repositories` block:
 ```kotlin
 plugins {
     // Keep your existing Kotlin/Android plugin here.
-    id("com.composables.kpm") version "0.3.0"
+    id("com.composables.kpm") version "0.5.0"
 }
 
 repositories {
@@ -393,7 +497,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
         run: |
-          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.4.0 sh
+          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.5.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"
@@ -419,7 +523,8 @@ git push --follow-tags
 
 ## package.yml reference
 
-This example includes every supported publishing field. Dependencies are described below:
+This example includes every supported publishing field. Dependencies are described below;
+the optional `plugins` mapping is covered in [Manage Gradle plugins](#manage-gradle-plugins).
 
 ```yaml
 name: My Kotlin Library
@@ -456,7 +561,7 @@ publishing:
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `name` | Yes | Display name of the library. |
+| `name` | No | Display name; defaults to the Gradle project name when omitted. |
 | `description` | For publishing | Summary of what the library does; optional for dependency management. |
 | `publishing.groupId` | Yes | Maven namespace, such as `com.example`. Also sets the Gradle project group. |
 | `publishing.artifactId` | Yes | Maven artifact name, such as `my-library`. |
@@ -479,7 +584,7 @@ publishing:
 | `publishing.issueManagement.system` | When `publishing.issueManagement` is present | Tracker name, such as `GitHub Issues`. |
 | `publishing.issueManagement.url` | When `publishing.issueManagement` is present | URL of the issue tracker. |
 
-The `publishing` block is optional. When omitted, KPM sets the package version without configuring Maven publishing. The fields marked required inside `publishing` are required only when publishing is configured. `name` and `version` are always required. `description` is required for publishing; it is optional for dependency management. These fields remain at the top level.
+The `publishing` block is optional. When omitted, KPM sets the package version without configuring Maven publishing. The fields marked required inside `publishing` are required only when publishing is configured. Only `version` is always required. `name` defaults to the Gradle project name; `description` is required for publishing and optional for dependency management. These fields remain at the top level.
 
 Existing top-level publishing fields remain supported until 1.0.0 and produce a deprecation warning. Move them under `publishing` to migrate. If both formats are present, the nested block takes precedence as a whole; KPM does not merge the formats.
 
@@ -550,7 +655,7 @@ go run ./scripts/build.go
 go test ./...
 
 # Test and validate the Gradle plugin
-./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins :gradle-settings-plugin:validatePlugins --console=plain
 ```
 
 The [Kotlin Multiplatform example](examples/kotlin-library) uses the local plugin

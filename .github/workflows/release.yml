@@ -57,7 +57,7 @@ jobs:
           test "$(build/native-release-check/kpm --version)" = "$version"
           cd dist
           sha256sum --check SHA256SUMS
-      - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins :gradle-settings-plugin:validatePlugins --console=plain
       - name: Verify initialization and module commands
         run: go test ./internal/cli -run TestInitGradleIntegration -count=1
         env:
@@ -96,7 +96,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew :gradle-plugin:publishAllPublicationsToMavenCentral --no-configuration-cache --console=plain
+        run: ./gradlew publishAllPublicationsToMavenCentral --no-configuration-cache --console=plain
 
   github-release:
     needs: [verify, maven]

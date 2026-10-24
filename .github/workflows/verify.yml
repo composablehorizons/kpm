@@ -49,7 +49,7 @@ jobs:
         with:
           go-version: stable
       - uses: gradle/actions/setup-gradle@v5
-      - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+      - run: ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins :gradle-settings-plugin:validatePlugins --console=plain
       - name: Verify initialization and module commands
         run: go test ./internal/cli -run TestInitGradleIntegration -count=1 -v
         env:

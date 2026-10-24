@@ -104,6 +104,16 @@ public class KpmPluginTest {
         assertTrue(runner(project(publishing), "help").buildAndFail().getOutput().contains("description"));
     }
 
+    @Test public void nameDefaultsToTheGradleProjectNameIncludingForPublishing() throws Exception {
+        Path app = project("version: 1.2.3\n");
+        runner(app, "help").build();
+        Path library = project(nestedMetadata().replace("name: Example\n", ""));
+        runner(library, "generatePomFileForMavenPublication").build();
+        String pom = Files.readString(library.resolve("build/publications/maven/pom-default.xml"));
+        assertTrue(pom.contains("<name>example</name>"));
+        assertTrue(runner(project("name: ''\nversion: 1.2.3\n"), "help").buildAndFail().getOutput().contains("non-empty string for 'name'"));
+    }
+
     @Test public void rejectsMalformedOrIncompletePublishing() throws Exception {
         assertTrue(runner(project("name: Example\ndescription: Example\nversion: 1.2.3\npublishing: false\n"), "help")
             .buildAndFail().getOutput().contains("publishing must be a YAML mapping"));

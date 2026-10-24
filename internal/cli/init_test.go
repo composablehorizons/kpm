@@ -38,7 +38,7 @@ func TestInitSetsUpKotlinAndGroovyAndIsRepeatable(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if field(p.document.Content[0], "name").Value != "hello-kotlin" || p.version.Value != "1.2.3" {
+		if field(p.document.Content[0], "name") != nil || p.version.Value != "1.2.3" {
 			t.Fatal("lost inferred package metadata")
 		}
 		if field(p.document.Content[0], "description") != nil {
@@ -51,7 +51,7 @@ func TestInitSetsUpKotlinAndGroovyAndIsRepeatable(t *testing.T) {
 		build := readFile(t, dir, "build"+suffix)
 		settings := readFile(t, dir, "settings"+suffix)
 		manifest := readFile(t, dir, "package.yml")
-		if !strings.Contains(build, `id("com.composables.kpm") version "0.4.0"`) || !strings.Contains(build, "example:existing:1.0") || !strings.Contains(build, "retain this note") {
+		if !strings.Contains(build, `id("com.composables.kpm") version "0.5.0"`) || !strings.Contains(build, "example:existing:1.0") || !strings.Contains(build, "retain this note") {
 			t.Fatalf("incorrect build:\n%s", build)
 		}
 		if strings.Contains(build, `version = "1.2.3"`) {
@@ -95,6 +95,18 @@ func TestInitInteractiveAndCancellation(t *testing.T) {
 	}
 	if readFile(t, dir, "build.gradle.kts") != build || readFile(t, dir, "settings.gradle.kts") != settings {
 		t.Fatal("cancelled init edited Gradle")
+	}
+}
+
+func TestInitAllowsOmittingThePackageName(t *testing.T) {
+	dir := initProject(t, false)
+	var output bytes.Buffer
+	if err := initCommand(dir, nil, strings.NewReader("\n\n\n"), &output, &output); err != nil {
+		t.Fatal(err)
+	}
+	manifest := readFile(t, dir, "package.yml")
+	if strings.Contains(manifest, "name:") || !strings.Contains(manifest, "version: 1.2.3") {
+		t.Fatalf("unexpected manifest:\n%s", manifest)
 	}
 }
 
@@ -143,7 +155,7 @@ func TestInitSupportsModuleAndInheritedPluginVersion(t *testing.T) {
 		t.Fatalf("conflicting inherited plugin version:\n%s", build)
 	}
 	manifest := readFile(t, dir, "package.yml")
-	if !strings.Contains(manifest, "name: app") || !strings.Contains(manifest, "version: 0.1.0") {
+	if strings.Contains(manifest, "name:") || !strings.Contains(manifest, "version: 0.1.0") {
 		t.Fatalf("incorrect module defaults:\n%s", manifest)
 	}
 	if _, err := os.Stat(filepath.Join(root, "package.yml")); !os.IsNotExist(err) {

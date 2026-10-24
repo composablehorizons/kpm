@@ -8,33 +8,19 @@ import java.util.Map;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** Connect package metadata to Gradle without owning targets. */
 public final class KpmPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
-        var file = project.getLayout().getProjectDirectory().file("package.yml");
-        if (!file.getAsFile().isFile()) {
+        var values = PackageManifest.read(project.getLayout().getProjectDirectory(), project.getProviders());
+        if (values == null) {
             throw new GradleException("KPM requires package.yml next to this project's build.gradle(.kts).");
         }
-        Metadata metadata;
-        Map<?, ?> values;
-        try {
-            var options = new LoaderOptions();
-            options.setAllowDuplicateKeys(false);
-            var yaml = new Yaml(new SafeConstructor(options));
-            Object document = yaml.load(project.getProviders().fileContents(file).getAsText().get());
-            values = mapping(document, "package.yml");
-            metadata = new Metadata(values);
-        } catch (GradleException error) {
-            throw error;
-        } catch (RuntimeException error) {
-            throw new GradleException("Invalid package.yml: " + error.getMessage(), error);
-        }
+        var metadata = new Metadata(values, project.getName());
 
+        if (values.containsKey("plugins")) PackagePlugins.parse(values.get("plugins")).values().forEach(plugin ->
+            project.getPluginManager().apply(plugin.id()));
         if (values.containsKey("dependencies") && values.get("dependencies") == null) {
             throw new GradleException("dependencies must be a list or a mapping of targets.");
         }
@@ -110,12 +96,12 @@ public final class KpmPlugin implements Plugin<Project> {
         final Map<?, ?> scm, issues;
         final boolean publishing, legacyPublishing;
 
-        Metadata(Map<?, ?> values) {
+        Metadata(Map<?, ?> values, String projectName) {
             version = text(values, "version");
             if (!version.matches("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?")) {
                 throw new GradleException("package.yml version must be a semantic version, such as 0.1.0.");
             }
-            name = text(values, "name");
+            name = values.containsKey("name") ? text(values, "name") : projectName;
             description = values.containsKey("description") ? text(values, "description") : null;
             legacyPublishing = !values.containsKey("publishing") && List.of(
                 "groupId", "artifactId", "url", "licenses", "developers", "scm", "issueManagement"

@@ -1,7 +1,7 @@
 # Releasing KPM
 
 Production publishing runs in [the Release workflow](.github/workflows/release.yml).
-It builds native CLI archives, publishes the Gradle plugin and marker to Maven
+It builds native CLI archives, publishes the project and settings Gradle plugins and their markers to Maven
 Central, and creates a draft GitHub release with the binaries, installers, and
 `SHA256SUMS` attached. Publish the draft after reviewing it to make those assets
 available to the installers. CLI distribution uses GitHub Releases.
@@ -34,7 +34,7 @@ available to the installers. CLI distribution uses GitHub Releases.
    ```sh
    go run ./scripts/build.go
    go test ./...
-   ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins --console=plain
+   ./gradlew :gradle-plugin:test :gradle-plugin:validatePlugins :gradle-settings-plugin:validatePlugins --console=plain
    KPM_GRADLE_INTEGRATION=1 go test ./internal/cli -run TestInitGradleIntegration -count=1
    ./gradlew -p examples/kotlin-library compileKotlinJvm compileKotlinWasmJs generatePomFileForKotlinMultiplatformPublication generatePomFileForJvmPublication --console=plain
    ```

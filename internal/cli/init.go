@@ -16,7 +16,7 @@ import (
 )
 
 // Keep development builds usable; release builds inject the matching CLI version.
-const developmentPluginVersion = "0.4.0"
+const developmentPluginVersion = "0.5.0"
 
 func initCommand(dir string, args []string, input io.Reader, out, stderr io.Writer) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
@@ -76,7 +76,7 @@ func initCommand(dir string, args []string, input io.Reader, out, stderr io.Writ
 	// Plan every Gradle edit before writing anything, so unsupported scripts stay intact.
 	updatedBuild, updatedSettings, err := setupGradle(string(buildData), string(settingsData), pluginVersion)
 	if err != nil {
-		return fmt.Errorf("cannot safely configure this Gradle layout: %w\nNo files changed. Manual setup:\n  Create package.yml with name and version (for example, 0.1.0).\n  Apply id(\"com.composables.kpm\") version %q in this project's plugins block.\n  Add mavenCentral() to pluginManagement.repositories in %s and to your dependency repositories.\nThen rerun kpm init", err, version, settings)
+		return fmt.Errorf("cannot safely configure this Gradle layout: %w\nNo files changed. Manual setup:\n  Create package.yml with a version (for example, 0.1.0).\n  Apply id(\"com.composables.kpm\") version %q in this project's plugins block.\n  Add mavenCentral() to pluginManagement.repositories in %s and to your dependency repositories.\nThen rerun kpm init", err, version, settings)
 	}
 	document, original, err := initManifest(dir)
 	if err != nil {
@@ -93,16 +93,9 @@ func initCommand(dir string, args []string, input io.Reader, out, stderr io.Writ
 	if publishing && field(root, "description") == nil {
 		return fmt.Errorf("package.yml publishing requires a description; add it before running kpm init")
 	}
-	name := filepath.Base(dir)
-	if filepath.Dir(build) == filepath.Dir(settings) {
-		settingsCode, _ := gradleCode(string(settingsData), false)
-		if match := regexp.MustCompile(`(?m)^\s*rootProject\.name\s*=\s*["']([^"']+)["']`).FindStringSubmatch(settingsCode); match != nil {
-			name = match[1]
-		}
-	}
 	initialVersion := inferVersion(dir, filepath.Dir(settings), string(buildData))
 	reader := bufio.NewReader(input)
-	for _, item := range []struct{ key, label, value string }{{"name", "Package name", name}, {"version", "Version", initialVersion}, {"description", "Description (optional)", ""}} {
+	for _, item := range []struct{ key, label, value string }{{"name", "Package name (optional)", ""}, {"version", "Version", initialVersion}, {"description", "Description (optional)", ""}} {
 		existing := field(root, item.key)
 		if existing != nil {
 			if existing.Kind != yaml.ScalarNode || existing.Tag != "!!str" || existing.Anchor != "" {
@@ -140,14 +133,10 @@ func initCommand(dir string, args []string, input io.Reader, out, stderr io.Writ
 						continue
 					}
 				}
-				if item.key == "name" && value == "" {
-					fmt.Fprintln(out, "Enter a package name.")
-					continue
-				}
 				break
 			}
 		}
-		if item.key != "description" || value != "" {
+		if item.key == "version" || value != "" {
 			put(root, item.key, scalar(value))
 		}
 	}

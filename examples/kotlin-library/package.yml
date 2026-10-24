@@ -1,6 +1,8 @@
 name: Example Kotlin Library
 description: A local consumer of the KPM Gradle plugin.
 version: 0.1.0-SNAPSHOT
+plugins:
+  kotlin-multiplatform: org.jetbrains.kotlin.multiplatform:2.4.0
 
 publishing:
   groupId: com.example
