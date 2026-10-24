@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-24
+
+### Removed
+
+- Remove shared version blocks, cross-manifest version imports, and version interpolation. Write versions directly in each plugin and dependency declaration, including in `buildSrc` manifests.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added
