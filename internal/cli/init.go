@@ -16,7 +16,7 @@ import (
 )
 
 // Keep development builds usable; release builds inject the matching CLI version.
-const developmentPluginVersion = "0.5.0"
+const developmentPluginVersion = "0.5.1"
 
 func initCommand(dir string, args []string, input io.Reader, out, stderr io.Writer) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)

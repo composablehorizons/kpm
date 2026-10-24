@@ -64,7 +64,7 @@ final class PackageDependencies {
 
     private void readList(String target, String scope, List<?> list) {
         for (Object value : list) {
-            if (!(value instanceof String notation) || !notation.matches("[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(:[^\\s:@]+)?"))
+            if (!(value instanceof String notation) || !notation.matches("[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(:[^\\s:@]+)?") || notation.contains("${"))
                 throw new GradleException("Dependencies must use group:artifact[:version] coordinates.");
             String id = dependencyId(notation);
             if (entries.stream().anyMatch(e -> e.target().equals(target) && dependencyId(e.notation()).equals(id)))

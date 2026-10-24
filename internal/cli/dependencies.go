@@ -75,7 +75,7 @@ func coordinates(value string, requireVersion bool) (string, string, error) {
 	version := ""
 	if len(parts) == 3 {
 		version = parts[2]
-		if version == "" || strings.ContainsAny(version, " @\t\r\n") {
+		if version == "" || strings.ContainsAny(version, " @\t\r\n") || strings.Contains(version, "${") {
 			return "", "", fmt.Errorf("invalid version in %q", value)
 		}
 	}
@@ -472,7 +472,7 @@ func dependencyCommand(dir string, args []string, out, stderr io.Writer) error {
 		if *save {
 			for _, row := range report.Dependencies {
 				for _, d := range deps {
-					if d.Target == row.Target && d.Scope == row.Scope && d.ID == row.ID && d.Declared != "" && !strings.ContainsAny(d.Declared, "+[](),") && !strings.Contains(d.Declared, "${") && !strings.HasPrefix(d.Declared, "latest.") {
+					if d.Target == row.Target && d.Scope == row.Scope && d.ID == row.ID && d.Declared != "" && !strings.ContainsAny(d.Declared, "+[](),") && !strings.HasPrefix(d.Declared, "latest.") {
 						d.node.Value = d.ID + ":" + row.Current
 					}
 				}

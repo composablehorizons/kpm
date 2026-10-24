@@ -45,7 +45,7 @@ Installation requires `curl`, `tar`, and either `sha256sum` or `shasum`.
 To install a specific release or choose a directory:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.5.0 --bin-dir "$HOME/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.5.1 --bin-dir "$HOME/.local/bin"
 ```
 
 ### Windows
@@ -59,7 +59,7 @@ irm https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/instal
 The installer selects Windows x64 or ARM64, verifies the checksum, and installs
 `kpm.exe` into `%LOCALAPPDATA%\Programs\kpm\bin`. It adds that directory to your
 user PATH. Open a new terminal and run `kpm --version`. To pin a release, set
-`$env:KPM_VERSION = '0.5.0'` before running the installer. `KPM_INSTALL_DIR` overrides
+`$env:KPM_VERSION = '0.5.1'` before running the installer. `KPM_INSTALL_DIR` overrides
 the installation directory on either platform.
 
 You can also download an archive and `SHA256SUMS` from
@@ -208,7 +208,7 @@ are available before Gradle compiles project scripts:
 
 ```kotlin
 plugins {
-    id("com.composables.kpm.settings") version "0.5.0"
+    id("com.composables.kpm.settings") version "0.5.1"
 }
 ```
 
@@ -243,36 +243,22 @@ work, and dependency commands preserve the `plugins` mapping.
 Add and edit plugin declarations directly in the manifest; dependency
 CLI commands operate on Maven dependencies only.
 
-### Share versions with build tooling
-
-Define named versions and reference them in plugin or dependency coordinates:
-
-```yaml
-versions:
-  kotlin: 2.4.0
-plugins:
-  kotlin-jvm: org.jetbrains.kotlin.jvm:${versions.kotlin}
-  compose-compiler: org.jetbrains.kotlin.plugin.compose:${versions.kotlin}
-```
+### Manage build tooling
 
 `buildSrc` is a separate Gradle build. Give it its own `package.yml`, apply the KPM
 settings integration there, and use only `id("com.composables.kpm")` in its project
-`plugins` block. Its manifest can reference the app's named Kotlin version:
+`plugins` block. Write versions directly in each declaration:
 
 ```yaml
 version: 0.1.0
-versions:
-  kotlin: {from: ../package.yml}
 plugins:
   gradle-plugin: java-gradle-plugin
 dependencies:
-  - org.jetbrains.kotlin:kotlin-gradle-plugin:${versions.kotlin}
+  - org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0
 ```
 
-`from` resolves relative to the declaring manifest and imports only the version
-with that name. It does not inherit plugins or dependencies. Missing sources,
-missing names, and circular references fail with an error. Gradle tracks referenced
-files for configuration-cache invalidation. `update --save` preserves version references.
+Each package owns its plugin and dependency declarations. Repeat versions where
+needed; manifests do not share versions or inherit declarations from other files.
 
 When `buildSrc` inherits KPM from its parent, requesting its version again can
 conflict with that existing classpath. This settings bootstrap also works when
@@ -287,7 +273,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             if (requested.id.id == "com.composables.kpm.settings") {
-                useModule("com.composables:kpm-settings:0.5.0")
+                useModule("com.composables:kpm-settings:0.5.1")
             }
         }
     }
@@ -363,7 +349,7 @@ there instead of adding a project-level `repositories` block:
 ```kotlin
 plugins {
     // Keep your existing Kotlin/Android plugin here.
-    id("com.composables.kpm") version "0.5.0"
+    id("com.composables.kpm") version "0.5.1"
 }
 
 repositories {
@@ -497,7 +483,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
         run: |
-          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.5.0 sh
+          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.5.1 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"

@@ -231,7 +231,7 @@ func TestInvalidDependencyCommandsDoNotModifyManifest(t *testing.T) {
 }
 func TestRejectsMalformedDependencyDeclarations(t *testing.T) {
 	for _, yaml := range []string{
-		"dependencies: false\n", "dependencies: [example:tool:]\n", "dependencies: [example:tool@latest]\n",
+		"dependencies: false\n", "dependencies: [example:tool:]\n", "dependencies: [example:tool@latest]\n", "dependencies:\n  - example:tool:${versions.tool}\n",
 		"dependencies:\n  common:\n    testOnly: []\n", "dependencies: [example:tool:1, example:tool:2]\n",
 		"dependencies: &deps [example:tool:1]\n", "dependencies:\n  common: [example:tool:1]\n  android: *missing\n",
 	} {
@@ -243,7 +243,7 @@ func TestRejectsMalformedDependencyDeclarations(t *testing.T) {
 }
 
 func TestUpdateSavePreservesSelectorsAndSavesExactResolvedVersions(t *testing.T) {
-	for _, version := range []string{"", "1.0.0", "1.+", "[1.0,2.0)", "${versions.tool}"} {
+	for _, version := range []string{"", "1.0.0", "1.+", "[1.0,2.0)"} {
 		t.Run(version, func(t *testing.T) {
 			notation := "example:tool"
 			if version != "" {

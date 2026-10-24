@@ -21,7 +21,7 @@ public final class PackagePlugins {
             if (!(key instanceof String alias) || !alias.matches("[a-z][a-zA-Z0-9]*([._-][a-zA-Z0-9]+)*")) {
                 throw new GradleException("Invalid plugin name '" + key + "'. Use letters, numbers, and single '-', '_', or '.' separators.");
             }
-            if (!(coordinate instanceof String text) || !text.matches("[A-Za-z0-9_][A-Za-z0-9_.-]*(?::[^\\s:]+)?")) {
+            if (!(coordinate instanceof String text) || !text.matches("[A-Za-z0-9_][A-Za-z0-9_.-]*(?::[^\\s:]+)?") || text.contains("${")) {
                 throw new GradleException("Plugin '" + alias + "' must be a plugin.id[:version] string.");
             }
             int separator = text.indexOf(':');

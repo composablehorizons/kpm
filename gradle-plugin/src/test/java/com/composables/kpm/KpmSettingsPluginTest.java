@@ -136,68 +136,39 @@ public class KpmSettingsPluginTest {
         assertFalse(runner(root, "help", "--configuration-cache").build().getOutput().contains("Reusing configuration cache"));
     }
 
-    @Test public void sharesExplicitVersionsAndTracksTheirSourcesWithoutInheritingDeclarations() throws Exception {
+    @Test public void rejectsSharedVersionBlocks() throws Exception {
         Path root = project();
-        Files.writeString(root.resolve("shared.yml"), """
-            versions:
-              library: '1.0'
-            plugins:
-              unwanted: missing.plugin:1.0
-            dependencies: [missing:dependency:1.0]
-            """);
         Files.writeString(root.resolve("package.yml"), """
-            name: Example
             version: 1.0.0
             versions:
               library: {from: shared.yml}
-            plugins:
-              library: example.library:${versions.library}
             """);
-        runner(root, "buildEnvironment", "--configuration-cache").build();
-        assertTrue(runner(root, "buildEnvironment", "--configuration-cache").build().getOutput().contains("Reusing configuration cache"));
-        pluginRepository(root, "1.1");
-        Files.writeString(root.resolve("shared.yml"), "versions:\n  library: '1.1'\n");
-        String output = runner(root, "buildEnvironment", "--configuration-cache").build().getOutput();
-        assertFalse(output.contains("Reusing configuration cache"));
-        assertTrue(output.contains("example.library:example.library.gradle.plugin:1.1"));
+        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("The versions block is not supported"));
     }
 
-    @Test public void expandsDependencyVersionsAndRejectsMissingAndCircularReferences() throws Exception {
+    @Test public void rejectsVersionReferencesInCoordinates() throws Exception {
         Path root = project();
-        String manifest = """
-            name: Example
+        Files.writeString(root.resolve("package.yml"), """
             version: 1.0.0
-            versions:
-              tool: 2.3.4
             plugins:
               java: java-library
             dependencies:
               - example:tool:${versions.tool}
-            """;
-        Files.writeString(root.resolve("package.yml"), manifest);
-        Files.writeString(root.resolve("build.gradle.kts"), """
-            plugins { id("com.composables.kpm") }
-            afterEvaluate { check(configurations.implementation.get().dependencies.single().version == "2.3.4") }
             """);
-        runner(root, "help").build();
-        Files.writeString(root.resolve("package.yml"), manifest.replace("tool: 2.3.4", "tool: '${versions.missing}'"));
-        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Missing versions.missing"));
-        Files.writeString(root.resolve("package.yml"), manifest.replace("tool: 2.3.4", "tool: '${versions.tool}'"));
-        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Circular version reference"));
-        Files.writeString(root.resolve("package.yml"), manifest.replace("tool: 2.3.4", "tool: {from: missing.yml}"));
-        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Shared version source does not exist"));
-        Files.writeString(root.resolve("package.yml"), manifest.replace("tool: 2.3.4", "tool: {from: shared.yml}"));
-        Files.writeString(root.resolve("shared.yml"), "versions:\n  tool: {from: package.yml}\n");
-        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Circular version reference"));
+        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("Dependencies must use group:artifact[:version]"));
+        Files.writeString(root.resolve("package.yml"), """
+            version: 1.0.0
+            plugins:
+              library: example.library:${versions.library}
+            """);
+        assertTrue(runner(root, "help").buildAndFail().getOutput().contains("must be a plugin.id[:version] string"));
     }
 
-    @Test public void managesBuildSrcPluginsAndDependenciesWithSharedVersions() throws Exception {
+    @Test public void managesBuildSrcPluginsAndDependenciesWithInlineVersions() throws Exception {
         Path root = project();
         Files.writeString(root.resolve("package.yml"), """
             name: Example
             version: 1.0.0
-            versions:
-              library: '1.0'
             plugins:
               convention: example.convention
             """);
@@ -212,14 +183,11 @@ public class KpmSettingsPluginTest {
             plugins { id("com.composables.kpm.settings") }
             """);
         Files.writeString(buildSrc.resolve("package.yml"), """
-            name: BuildLogic
             version: 1.0.0
-            versions:
-              library: {from: ../package.yml}
             plugins:
               gradle: java-gradle-plugin
             dependencies:
-              - example.library:example.library.gradle.plugin:${versions.library}
+              - example.library:example.library.gradle.plugin:1.0
             """);
         Files.writeString(buildSrc.resolve("build.gradle.kts"), """
             plugins { id("com.composables.kpm") }
