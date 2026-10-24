@@ -2,8 +2,16 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-24
+
+### Added
+
+- Declare project plugins in `package.yml`. The KPM settings integration resolves them, and the project plugin applies them without repeating declarations in Gradle scripts. Kotlin DSL configuration blocks remain available, including in `buildSrc` packages with their own manifests.
+- Reference named versions in plugin and dependency declarations, optionally importing individual versions from another manifest. Dependency updates preserve these references.
+
 ### Changed
 
+- Package names are optional and default to the Gradle project name. `kpm init` leaves out `name` unless you enter one.
 - Distribute native CLI archives and SHA-256 checksums through GitHub Releases. Install using `scripts/install.sh` on macOS/Linux or `scripts/install.ps1` on Windows; rerun the installer to update.
 - Remove the npm package, Node launcher, npm update notifier, and Bun build tooling. Build release archives with Go and use `VERSION` as the shared CLI/Gradle plugin release version.
 
