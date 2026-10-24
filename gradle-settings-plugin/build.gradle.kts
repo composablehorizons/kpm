@@ -17,6 +17,7 @@ gradlePlugin {
 }
 dependencies { implementation("org.yaml:snakeyaml:2.4") }
 tasks.processResources {
-    inputs.property("version", project.version.toString())
-    filesMatching("kpm-version.properties") { expand("version" to project.version.toString()) }
+    val pluginVersion = project.version.toString()
+    inputs.property("version", pluginVersion)
+    filesMatching("kpm-version.properties") { expand("version" to pluginVersion) }
 }
