@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-01
+
+### Added
+
+- Choose how long `kpm publish` waits for Maven Central with the Gradle property `mavenCentralDeploymentValidation`: `NONE` (the default, upload only), `VALIDATED`, or `PUBLISHED`. A release that Central rejects now fails the publish when validation is enabled.
+
 ## [0.5.1] - 2026-10-24
 
 ### Removed

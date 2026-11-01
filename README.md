@@ -45,7 +45,7 @@ Installation requires `curl`, `tar`, and either `sha256sum` or `shasum`.
 To install a specific release or choose a directory:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.5.1 --bin-dir "$HOME/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | sh -s -- --version 0.6.0 --bin-dir "$HOME/.local/bin"
 ```
 
 ### Windows
@@ -59,7 +59,7 @@ irm https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/instal
 The installer selects Windows x64 or ARM64, verifies the checksum, and installs
 `kpm.exe` into `%LOCALAPPDATA%\Programs\kpm\bin`. It adds that directory to your
 user PATH. Open a new terminal and run `kpm --version`. To pin a release, set
-`$env:KPM_VERSION = '0.5.1'` before running the installer. `KPM_INSTALL_DIR` overrides
+`$env:KPM_VERSION = '0.6.0'` before running the installer. `KPM_INSTALL_DIR` overrides
 the installation directory on either platform.
 
 You can also download an archive and `SHA256SUMS` from
@@ -208,7 +208,7 @@ are available before Gradle compiles project scripts:
 
 ```kotlin
 plugins {
-    id("com.composables.kpm.settings") version "0.5.1"
+    id("com.composables.kpm.settings") version "0.6.0"
 }
 ```
 
@@ -273,7 +273,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             if (requested.id.id == "com.composables.kpm.settings") {
-                useModule("com.composables:kpm-settings:0.5.1")
+                useModule("com.composables:kpm-settings:0.6.0")
             }
         }
     }
@@ -349,7 +349,7 @@ there instead of adding a project-level `repositories` block:
 ```kotlin
 plugins {
     // Keep your existing Kotlin/Android plugin here.
-    id("com.composables.kpm") version "0.5.1"
+    id("com.composables.kpm") version "0.6.0"
 }
 
 repositories {
@@ -410,7 +410,7 @@ kpm publish
 
 For a package starting at `0.1.0-SNAPSHOT`, `kpm version patch` changes it to `0.1.0`, commits `package.yml`, and creates the annotated tag `v0.1.0`.
 
-`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads them for automatic release on Maven Central. It returns after upload without waiting for Central validation or download availability. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
+`kpm publish` builds the configured publications, signs them when signing credentials are provided, and uploads them for automatic release on Maven Central. By default it returns after upload without waiting for Central. Set the Gradle property `mavenCentralDeploymentValidation` to `VALIDATED` to wait until Central has validated the deployment, or to `PUBLISHED` to wait until it is downloadable, for example `ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation=VALIDATED kpm publish`. It uses your project's Gradle wrapper. It does not run your test suite or push Git changes; those are separate steps you control.
 
 For later releases, use `patch`, `minor`, `major`, or an exact version:
 
@@ -483,7 +483,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Install KPM
         run: |
-          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.5.1 sh
+          curl -fsSL https://raw.githubusercontent.com/composablehorizons/kpm/main/scripts/install.sh | KPM_VERSION=0.6.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify release version
         run: test "v$(kpm version)" = "$GITHUB_REF_NAME"

@@ -4,6 +4,7 @@ import com.vanniktech.maven.publish.DeploymentValidation;
 import com.vanniktech.maven.publish.MavenPublishBaseExtension;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
@@ -34,7 +35,7 @@ public final class KpmPlugin implements Plugin<Project> {
         project.getPluginManager().apply("com.vanniktech.maven.publish");
         var publishing = project.getExtensions().getByType(MavenPublishBaseExtension.class);
         publishing.coordinates(metadata.groupId, metadata.artifactId, metadata.version);
-        publishing.publishToMavenCentral(true, DeploymentValidation.NONE);
+        publishing.publishToMavenCentral(true, deploymentValidation(project));
         if (!project.getProviders().gradleProperty("signingInMemoryKey").getOrElse("").isBlank()) {
             publishing.signAllPublications();
         }
@@ -124,6 +125,16 @@ public final class KpmPlugin implements Plugin<Project> {
             for (String key : List.of("connection", "developerConnection", "url")) text(scm, key);
             issues = publication.containsKey("issueManagement") ? mapping(publication.get("issueManagement"), "issueManagement") : null;
             if (issues != null) { text(issues, "system"); text(issues, "url"); }
+        }
+    }
+
+    /** How long publishing waits for Maven Central: NONE (upload only, the default), VALIDATED, or PUBLISHED. */
+    private static DeploymentValidation deploymentValidation(Project project) {
+        String value = project.getProviders().gradleProperty("mavenCentralDeploymentValidation").getOrElse("NONE").trim();
+        try {
+            return DeploymentValidation.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new GradleException("mavenCentralDeploymentValidation must be NONE, VALIDATED or PUBLISHED, but was '" + value + "'.");
         }
     }
 }

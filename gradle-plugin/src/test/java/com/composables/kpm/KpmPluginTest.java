@@ -121,6 +121,15 @@ public class KpmPluginTest {
             .buildAndFail().getOutput().contains("artifactId"));
     }
 
+    @Test public void readsMavenCentralDeploymentValidationFromGradleProperty() throws Exception {
+        Path root = project(nestedMetadata());
+        for (String value : new String[] {"NONE", "validated", "PUBLISHED"}) {
+            runner(root, "help", "-PmavenCentralDeploymentValidation=" + value).build();
+        }
+        assertTrue(runner(root, "help", "-PmavenCentralDeploymentValidation=sometimes").buildAndFail().getOutput()
+            .contains("mavenCentralDeploymentValidation must be NONE, VALIDATED or PUBLISHED, but was 'sometimes'."));
+    }
+
     private void localArtifact(Path repository, String version) throws Exception {
         Path directory = repository.resolve("example/tool/" + version);
         Files.createDirectories(directory);
